@@ -17,6 +17,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { AuthUser } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface SidebarProps {
   activeTab: string;
@@ -25,6 +26,7 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   currentUser: AuthUser | null;
   onOpenSwitchBoard: () => void;
+  isDevSupervisorVisible?: boolean;
 }
 
 interface NavItem {
@@ -57,6 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   currentUser,
   onOpenSwitchBoard,
+  isDevSupervisorVisible = false,
 }) => {
   const allowed = currentUser?.allowedTabs || [];
   const visibleItems = NAV_ITEMS.filter((item) => {
@@ -70,7 +73,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className={`fixed top-0 left-0 h-screen z-30 hidden lg:flex flex-col bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 select-none ${
+      className={`fixed ${
+        isDevSupervisorVisible ? 'top-8 h-[calc(100vh-32px)]' : 'top-0 h-screen'
+      } left-0 z-30 hidden lg:flex flex-col bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 select-none ${
         collapsed ? 'w-[68px]' : 'w-64'
       }`}
     >
@@ -141,6 +146,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Collapse Toggle & Footer */}
       <div className="p-3 border-t border-slate-800 bg-slate-950/60 flex flex-col gap-2">
+        {!collapsed && <PWAInstallButton variant="sidebar" />}
+
         <button
           onClick={onToggleCollapse}
           className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors text-xs font-semibold"

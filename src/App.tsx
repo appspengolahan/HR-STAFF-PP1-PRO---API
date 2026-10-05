@@ -23,6 +23,8 @@ import { RoleSimulatorBar } from './components/RoleSimulatorBar';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { MobileNav } from './components/MobileNav';
+import { OfflineIndicator } from './components/OfflineIndicator';
+import { PWAInstallButton } from './components/PWAInstallButton';
 import { LoginGateModal } from './components/LoginGateModal';
 import { HelpModal } from './components/modals/HelpModal';
 import { SwitchBoardModal } from './components/modals/SwitchBoardModal';
@@ -393,6 +395,7 @@ export default function App() {
         onToggleTheme={handleToggleTheme}
         onTriggerSecretDoor={() => setSecretDoorTriggered(true)}
         sidebarCollapsed={sidebarCollapsed}
+        isDevSupervisorVisible={isDevSupervisorVisible}
       />
 
       {/* Sidebar for Desktop / Tablet */}
@@ -403,15 +406,21 @@ export default function App() {
         onToggleCollapse={handleToggleSidebar}
         currentUser={currentUser}
         onOpenSwitchBoard={() => setIsSwitchBoardOpen(true)}
+        isDevSupervisorVisible={isDevSupervisorVisible}
       />
 
       {/* Main Viewport */}
       <div
-        className={`flex-1 flex flex-col transition-all duration-300 pt-16 pb-20 lg:pb-10 ${
+        className={`flex-1 flex flex-col transition-all duration-300 pt-16 pb-24 lg:pb-10 ${
           isDevSupervisorVisible ? 'mt-8' : ''
         } ${sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-64'}`}
       >
         <main className="flex-1 p-3 sm:p-6 max-w-7xl w-full mx-auto">
+          {/* Mobile Install PWA Banner */}
+          <div className="lg:hidden mb-3 no-print">
+            <PWAInstallButton variant="mobile-banner" />
+          </div>
+
           {activeTab === 'dashboard' && (
             <DashboardTab
               staffList={staffList}
@@ -627,6 +636,9 @@ export default function App() {
         onCloseSecretDoorTrigger={() => setSecretDoorTriggered(false)}
         onUnlockDeveloperMode={() => setIsDevSupervisorVisible(true)}
       />
+
+      {/* Offline Status Toast */}
+      <OfflineIndicator />
     </div>
   );
 }

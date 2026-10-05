@@ -61,7 +61,13 @@ function writeStorage<T>(key: string, data: T): void {
 export const storageService = {
   // Staff Master
   getStaffList(): StaffData[] {
-    return readStorage<StaffData[]>(KEYS.STAFF, INITIAL_STAFF_LIST);
+    const list = readStorage<StaffData[]>(KEYS.STAFF, INITIAL_STAFF_LIST);
+    // Auto-migrate if previously stored list was the 24-staff mock
+    if (!list || list.length < 32) {
+      writeStorage(KEYS.STAFF, INITIAL_STAFF_LIST);
+      return INITIAL_STAFF_LIST;
+    }
+    return list;
   },
   saveStaffList(list: StaffData[]): void {
     writeStorage(KEYS.STAFF, list);
@@ -205,7 +211,12 @@ export const storageService = {
 
   // Link Arsip
   getLinksList(): LinkArsip[] {
-    return readStorage<LinkArsip[]>(KEYS.LINKS, INITIAL_LINKS);
+    const list = readStorage<LinkArsip[]>(KEYS.LINKS, INITIAL_LINKS);
+    if (!list || list.length < 30) {
+      writeStorage(KEYS.LINKS, INITIAL_LINKS);
+      return INITIAL_LINKS;
+    }
+    return list;
   },
   saveLinksList(list: LinkArsip[]): void {
     writeStorage(KEYS.LINKS, list);

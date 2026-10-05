@@ -13,6 +13,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { AuthUser } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface NavbarProps {
   currentUser: AuthUser | null;
@@ -26,6 +27,7 @@ interface NavbarProps {
   onToggleTheme: () => void;
   onTriggerSecretDoor: () => void;
   sidebarCollapsed: boolean;
+  isDevSupervisorVisible?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -40,6 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTheme,
   onTriggerSecretDoor,
   sidebarCollapsed,
+  isDevSupervisorVisible = false,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
@@ -71,7 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header
-      className={`fixed top-0 right-0 h-16 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-20 transition-all duration-300 flex items-center justify-between px-3 sm:px-6 shadow-xs ${
+      className={`fixed ${isDevSupervisorVisible ? 'top-8' : 'top-0'} right-0 h-16 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-20 transition-all duration-300 flex items-center justify-between px-3 sm:px-6 shadow-xs ${
         sidebarCollapsed ? 'lg:left-[68px] left-0' : 'lg:left-64 left-0'
       }`}
     >
@@ -119,6 +122,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Right: Actions */}
       <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* PWA Install Button */}
+        <PWAInstallButton variant="nav" />
+
         {/* Switch Board */}
         <button
           onClick={onOpenSwitchBoard}

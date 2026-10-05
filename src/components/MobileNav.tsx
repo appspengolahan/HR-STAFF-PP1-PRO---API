@@ -40,7 +40,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 z-30 flex items-center justify-around px-2 lg:hidden shadow-2xl no-print">
+    <nav className="fixed bottom-0 left-0 right-0 h-16 pb-[env(safe-area-inset-bottom)] bg-slate-900/95 backdrop-blur-md border-t border-slate-800 z-30 flex items-center justify-around px-1 lg:hidden shadow-2xl no-print">
       {items.map((it) => {
         const Icon = it.icon;
         const isActive = activeTab === it.id;
@@ -48,12 +48,14 @@ export const MobileNav: React.FC<MobileNavProps> = ({
           <button
             key={it.id}
             onClick={() => onSelectTab(it.id)}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${
-              isActive ? 'text-blue-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            className={`flex flex-col items-center justify-center flex-1 h-full min-h-[48px] py-1 transition-all select-none active:scale-95 ${
+              isActive ? 'text-blue-400 font-bold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Icon className={`w-5 h-5 mb-0.5 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
-            <span className="text-[10px] truncate max-w-[64px]">{it.label}</span>
+            <div className={`p-1 rounded-xl transition-colors ${isActive ? 'bg-blue-600/20' : ''}`}>
+              <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
+            </div>
+            <span className="text-[10px] truncate max-w-[64px] mt-0.5">{it.label}</span>
           </button>
         );
       })}
@@ -61,10 +63,12 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       {!isStaff && (
         <button
           onClick={onOpenMoreMenu}
-          className="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-200 transition-colors"
+          className="flex flex-col items-center justify-center flex-1 h-full min-h-[48px] py-1 text-slate-400 hover:text-slate-200 transition-colors select-none active:scale-95"
         >
-          <Menu className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px]">Lainnya</span>
+          <div className="p-1 rounded-xl hover:bg-slate-800">
+            <Menu className="w-5 h-5" />
+          </div>
+          <span className="text-[10px] mt-0.5">Lainnya</span>
         </button>
       )}
     </nav>
