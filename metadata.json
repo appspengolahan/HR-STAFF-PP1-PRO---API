@@ -1,0 +1,6 @@
+{
+  "name": "Sistem HR Staff & Karyawan — PT Batu Karang",
+  "description": "Sistem manajemen kepegawaian modern untuk Staf Kantor, Karyawan Tetap, dan Kontrak Bulanan PT Batu Karang.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

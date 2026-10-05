@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply antialiased text-slate-800 bg-slate-50 transition-colors duration-200;
+  }
+}
+
+/* Print Rules */
+@page {
+  margin: 12mm 10mm;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Force print paper background */
+  #surat-ijin-print-paper,
+  #slip-gaji-a4-sheet,
+  #thermal-slip-paper {
+    box-shadow: none !important;
+    border: 1px solid #000000 !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  aside,
+  header,
+  nav,
+  button {
+    display: none !important;
+  }
+
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
