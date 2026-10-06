@@ -24,20 +24,34 @@ import {
 } from '../data/initialData';
 
 const KEYS = {
-  STAFF: 'bk_hr_staff_list_v2',
-  PRESENSI: 'bk_hr_presensi_list_v2',
-  LEMBUR: 'bk_hr_lembur_list_v2',
-  CUTI: 'bk_hr_cuti_list_v2',
-  MUTASI: 'bk_hr_mutasi_list_v2',
-  CALON: 'bk_hr_calon_list_v2',
-  LINKS: 'bk_hr_links_list_v2',
-  KPI: 'bk_hr_kpi_list_v2',
-  ARCHIVE: 'bk_hr_deleted_archive_v2',
-  AUTH_USER: 'bk_hr_auth_user_v2',
-  GAS_CONFIG: 'bk_hr_gas_config_v2',
-  THEME_MODE: 'bk_hr_theme_mode_v2',
-  SIDEBAR_COLLAPSED: 'bk_hr_sidebar_collapsed_v2',
+  STAFF: 'bk_hr_staff_list_v3',
+  PRESENSI: 'bk_hr_presensi_list_v3',
+  LEMBUR: 'bk_hr_lembur_list_v3',
+  CUTI: 'bk_hr_cuti_list_v3',
+  MUTASI: 'bk_hr_mutasi_list_v3',
+  CALON: 'bk_hr_calon_list_v3',
+  LINKS: 'bk_hr_links_list_v3',
+  KPI: 'bk_hr_kpi_list_v3',
+  ARCHIVE: 'bk_hr_deleted_archive_v3',
+  AUTH_USER: 'bk_hr_auth_user_v3',
+  GAS_CONFIG: 'bk_hr_gas_config_v3',
+  THEME_MODE: 'bk_hr_theme_mode_v3',
+  SIDEBAR_COLLAPSED: 'bk_hr_sidebar_collapsed_v3',
 };
+
+// Cleanup old obsolete v1 and v2 keys
+if (typeof window !== 'undefined' && window.localStorage) {
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('bk_hr_') && (k.endsWith('_v1') || k.endsWith('_v2') || k.endsWith('_mock'))) {
+        localStorage.removeItem(k);
+      }
+    }
+  } catch (e) {
+    // Ignore storage cleanup error
+  }
+}
 
 function readStorage<T>(key: string, fallback: T): T {
   try {
