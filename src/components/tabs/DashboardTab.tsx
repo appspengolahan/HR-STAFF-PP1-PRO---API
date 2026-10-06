@@ -296,11 +296,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           </div>
 
           <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
-            * Catatan: Beban lembur resmi (SPKL) bulan ini tercatat sebesar{' '}
-            <strong className="text-emerald-600 dark:text-emerald-400 font-bold">
-              {formatRupiah(stats.totalNominalLembur)}
-            </strong>{' '}
-            ({stats.countLembur} kejadian). Rincian gaji per staf dapat dicetak pada tab Slip Gaji.
+            * Catatan: {stats.countLembur > 0 ? (
+              <>
+                Beban lembur resmi (SPKL) bulan ini tercatat sebesar{' '}
+                <strong className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  {formatRupiah(stats.totalNominalLembur)}
+                </strong>{' '}
+                ({stats.countLembur} kejadian).
+              </>
+            ) : (
+              'Tidak ada riwayat lembur resmi (SPKL) tercatat pada bulan ini.'
+            )}{' '}
+            Rincian gaji per staf dapat dicetak pada tab Slip Gaji.
           </p>
         </div>
 

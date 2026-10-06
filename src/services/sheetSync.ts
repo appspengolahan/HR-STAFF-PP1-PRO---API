@@ -1,4 +1,4 @@
-import { StaffData, PresensiRecord, LinkArsip } from '../types';
+import { StaffData, PresensiRecord, LinkArsip, LemburRecord } from '../types';
 import { storageService } from './storageService';
 
 const SPREADSHEET_ID = '1KzEFolz_sE2bhUPTn2U2NWWPAgs3V9fpatYc7t1aGs0';
@@ -43,6 +43,7 @@ export const sheetSyncService = {
     staffCount: number;
     presensiCount: number;
     linksCount: number;
+    lemburCount: number;
   }> {
     // 1. Fetch MASTER_STAFF
     const staffRows = await this.fetchLiveSheetCsv('MASTER_STAFF');
@@ -249,10 +250,47 @@ export const sheetSyncService = {
       console.warn('Gagal membaca LOG_PRESENSI_IJIN:', e);
     }
 
+    // 4. Fetch LOG_LEMBUR
+    let newLembur: LemburRecord[] = [];
+    try {
+      const lemburRows = await this.fetchLiveSheetCsv('LOG_LEMBUR');
+      lemburRows.slice(1).forEach((r, idx) => {
+        if (r.length > 3 && r[2] && r[3] && r[2].trim() && r[3].trim()) {
+          const rawTgl = r[2].replace(/^"|"$/g, '').trim();
+          const nama = r[3].replace(/^"|"$/g, '').trim();
+          const sekup = (r[4] || 'Operasional').replace(/^"|"$/g, '').trim() as any;
+          const kategori = (r[7] || 'Di Luar Jam Kerja').replace(/^"|"$/g, '').trim();
+          const jamMulai = (r[8] || '').replace(/^"|"$/g, '').trim();
+          const jamSelesai = (r[9] || '').replace(/^"|"$/g, '').trim();
+          const nominal = parseInt((r[11] || '0').replace(/[^\d]/g, ''), 10) || 0;
+          const st = newStaff.find((s) => s.nama === nama);
+          newLembur.push({
+            id: `lb-sheet-${idx + 1}`,
+            tanggal: rawTgl,
+            nip: st?.nip || `BK-PP1-${idx + 1}`,
+            nama,
+            sekup,
+            kategori: kategori as any,
+            jamMulai,
+            jamSelesai,
+            nominal,
+            status: 'Disetujui',
+            bulan: 10,
+            tahun: 2026,
+          });
+        }
+      });
+      storageService.saveLemburList(newLembur);
+    } catch (e) {
+      console.warn('Gagal membaca LOG_LEMBUR:', e);
+      storageService.saveLemburList([]);
+    }
+
     return {
       staffCount: newStaff.length,
       presensiCount: newPresensi.length,
       linksCount: newLinks.length,
+      lemburCount: newLembur.length,
     };
   },
 };

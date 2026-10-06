@@ -8381,53 +8381,7 @@ export const INITIAL_PRESENSI_LIST: PresensiRecord[] = [
   }
 ];
 
-export const INITIAL_LEMBUR_LIST: LemburRecord[] = [
-  {
-    id: "lmb-001",
-    tanggal: "2026-10-01",
-    nip: "BK-PP1-004",
-    nama: "Ogik Indrawan",
-    sekup: "Operasional",
-    kategori: "Di Luar Jam Kerja (Weekday/Sabtu)",
-    jamMulai: "16:00",
-    jamSelesai: "19:00",
-    nominal: 330989,
-    status: "Disetujui",
-    keterangan: "Pengawasan ekstra proses blend komoditas tembakau",
-    bulan: 10,
-    tahun: 2026
-  },
-  {
-    id: "lmb-002",
-    tanggal: "2026-10-02",
-    nip: "BK-PP1-008",
-    nama: "Edward Antonius Effendy",
-    sekup: "Operasional",
-    kategori: "Di Luar Jam Kerja (Weekday/Sabtu)",
-    jamMulai: "16:00",
-    jamSelesai: "18:00",
-    nominal: 314401,
-    status: "Disetujui",
-    keterangan: "Maintenance berkala mesin pemotong KT 2",
-    bulan: 10,
-    tahun: 2026
-  },
-  {
-    id: "lmb-003",
-    tanggal: "2026-10-03",
-    nip: "BK-PP1-013",
-    nama: "Santoso Sapto Atmojo",
-    sekup: "Operasional",
-    kategori: "Minggu",
-    jamMulai: "16:00",
-    jamSelesai: "20:00",
-    nominal: 383319,
-    status: "Disetujui",
-    keterangan: "Overhaul dan pembersihan turbin boiler tekanan uap",
-    bulan: 10,
-    tahun: 2026
-  }
-];
+export const INITIAL_LEMBUR_LIST: LemburRecord[] = [];
 
 export const INITIAL_CUTI_LIST: CutiRecord[] = [
   {

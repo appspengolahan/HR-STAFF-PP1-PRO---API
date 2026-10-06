@@ -172,7 +172,13 @@ export const storageService = {
 
   // Lembur
   getLemburList(): LemburRecord[] {
-    return readStorage<LemburRecord[]>(KEYS.LEMBUR, INITIAL_LEMBUR_LIST);
+    const list = readStorage<LemburRecord[]>(KEYS.LEMBUR, INITIAL_LEMBUR_LIST);
+    if (list && list.some((l) => l.id.startsWith('lmb-00'))) {
+      const cleanList = list.filter((l) => !l.id.startsWith('lmb-00'));
+      writeStorage(KEYS.LEMBUR, cleanList);
+      return cleanList;
+    }
+    return list || [];
   },
   saveLemburList(list: LemburRecord[]): void {
     writeStorage(KEYS.LEMBUR, list);
