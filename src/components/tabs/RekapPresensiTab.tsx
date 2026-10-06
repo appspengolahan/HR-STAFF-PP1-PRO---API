@@ -1,16 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import {
-  BarChart3,
   Printer,
   TrendingUp,
   Award,
   AlertTriangle,
   CheckCircle2,
-  Users,
-  Flame,
   Medal,
   Clock,
   Percent,
+  Search,
+  Filter,
+  ArrowUpDown,
+  Flame,
 } from 'lucide-react';
 import { PresensiRecord, StaffData } from '../../types';
 import { NAMA_BULAN_INDO } from '../../services/payrollEngine';
@@ -38,7 +39,14 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
   const [filterStaffNip, setFilterStaffNip] = useState<string>(
     isStaffPortal && currentUserNip ? currentUserNip : ''
   );
-  const [rankingViewMode, setRankingViewMode] = useState<'terbaik' | 'pembinaan'>('terbaik');
+
+  // Search & Filter state for Ranking Balok
+  const [searchStaff, setSearchStaff] = useState('');
+  const [filterUnit, setFilterUnit] = useState<'Semua' | 'Operasional' | 'Administrasi'>('Semua');
+  const [sortDirection, setSortDirection] = useState<'desc' | 'asc'>('desc'); // desc = tertinggi ke terendah
+
+  // Toggle for Line Trend Chart Metric
+  const [trendMetric, setTrendMetric] = useState<'kehadiran' | 'ijin'>('kehadiran');
 
   const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
@@ -104,6 +112,10 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
         0,
         Math.min(100, ((stdPerMonth - totalIjinMenit) / stdPerMonth) * 100)
       );
+      const pctIjin = Math.max(
+        0,
+        Math.min(100, (totalIjinMenit / stdPerMonth) * 100)
+      );
 
       return {
         bulanNum,
@@ -112,22 +124,30 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
         totalIjinMenit,
         countIjin,
         pctKehadiran,
+        pctIjin,
       };
     });
   }, [presensiList, staffList, filterTahun]);
 
-  // 3. Rankings
-  const ranked = useMemo(() => {
-    return [...staffRekapList].sort((a, b) => b.pctKehadiran - a.pctKehadiran);
-  }, [staffRekapList]);
+  // 3. Ranked staff list for all 32 staff
+  const allStaffRanked = useMemo(() => {
+    const sorted = [...staffRekapList].sort((a, b) => {
+      if (sortDirection === 'desc') {
+        return b.pctKehadiran - a.pctKehadiran;
+      }
+      return a.pctKehadiran - b.pctKehadiran;
+    });
 
-  const top10Terbaik = useMemo(() => ranked.slice(0, 10), [ranked]);
-  const bottom10Pembinaan = useMemo(() => {
-    return [...staffRekapList]
-      .filter((s) => s.totalIjinPeriode > 0)
-      .sort((a, b) => a.pctKehadiran - b.pctKehadiran)
-      .slice(0, 10);
-  }, [staffRekapList]);
+    return sorted.filter((s) => {
+      const matchSearch =
+        s.nama.toLowerCase().includes(searchStaff.toLowerCase()) ||
+        s.nip.toLowerCase().includes(searchStaff.toLowerCase()) ||
+        s.jabatan.toLowerCase().includes(searchStaff.toLowerCase());
+      const matchUnit =
+        filterUnit === 'Semua' ? true : s.sekup === filterUnit;
+      return matchSearch && matchUnit;
+    });
+  }, [staffRekapList, sortDirection, searchStaff, filterUnit]);
 
   // 4. Overall KPI Summary
   const kpiSummary = useMemo(() => {
@@ -163,6 +183,67 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
       document.title = originalTitle;
     }, 1000);
   };
+
+  // Helper to format float to Indonesian comma representation: e.g. "97,43%"
+  const formatPctIndo = (num: number): string => {
+    return num.toFixed(2).replace('.', ',') + '%';
+  };
+
+  // =========================================================================
+  // SVG AREA LINE CHART COORDINATES GENERATION (Gambar 1 Reference)
+  // =========================================================================
+  const svgWidth = 980;
+  const svgHeight = 260;
+  const padLeft = 65;
+  const padRight = 45;
+  const padTop = 50;
+  const padBottom = 45;
+  const plotWidth = svgWidth - padLeft - padRight;
+  const plotHeight = svgHeight - padTop - padBottom;
+
+  // Determine Y-scale
+  const values = monthlyTrendData.map((m) =>
+    trendMetric === 'kehadiran' ? m.pctKehadiran : m.pctIjin
+  );
+
+  let yMin = trendMetric === 'kehadiran' ? 92.0 : 0.0;
+  let yMax = trendMetric === 'kehadiran' ? 100.5 : 5.5;
+
+  if (trendMetric === 'kehadiran') {
+    const minVal = Math.min(...values);
+    yMin = Math.max(88, Math.floor(minVal - 1.5));
+  } else {
+    const maxVal = Math.max(...values);
+    yMax = Math.max(3.5, Math.ceil(maxVal + 0.8));
+  }
+
+  const yRange = yMax - yMin || 1;
+
+  // Points coordinates
+  const points = monthlyTrendData.map((m, idx) => {
+    const x = padLeft + (idx / (monthlyTrendData.length - 1)) * plotWidth;
+    const val = trendMetric === 'kehadiran' ? m.pctKehadiran : m.pctIjin;
+    const y = padTop + plotHeight - ((val - yMin) / yRange) * plotHeight;
+    return { x, y, val, month: m };
+  });
+
+  // SVG Line path
+  const linePathD = points.reduce((acc, p, idx) => {
+    return idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
+  }, '');
+
+  // SVG Area path (fading to bottom)
+  const baselineY = padTop + plotHeight;
+  const areaPathD = points.length > 0
+    ? `${linePathD} L ${points[points.length - 1].x} ${baselineY} L ${points[0].x} ${baselineY} Z`
+    : '';
+
+  // Y-axis grid ticks (5 steps)
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((pct) => {
+    const val = yMin + pct * yRange;
+    const y = padTop + plotHeight - pct * plotHeight;
+    return { val, y };
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -278,11 +359,11 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
             <Percent className="w-4 h-4 text-blue-500" />
           </div>
           <div className="text-2xl font-black font-mono text-slate-900 dark:text-white">
-            {kpiSummary.avgPct.toFixed(2)}%
+            {formatPctIndo(kpiSummary.avgPct)}
           </div>
           <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" />
-            <span>Target Minimum Baku: &ge; 95.0%</span>
+            <span>Target Minimum Baku: &ge; 95,0%</span>
           </div>
         </div>
 
@@ -321,10 +402,10 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
       </div>
 
       {/* ============================================================== */}
-      {/* GRAFIS 1: TREND KEHADIRAN BULANAN (MONTHLY ATTENDANCE TREND)    */}
+      {/* 1. GRAFIS TREN TINGKAT KEHADIRAN BULANAN (GRAFIK GARIS GAMBAR 1) */}
       {/* ============================================================== */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
               <TrendingUp className="w-4 h-4" />
@@ -334,76 +415,187 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
                 Grafik Tren Tingkat Kehadiran Bulanan (Jan – Des {filterTahun})
               </h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Persentase jam kerja efektif operasional dan volume menit izin staf per bulan
+                Visualisasi kurva garis persentase jam kerja efektif operasional PT Batu Karang
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 text-xs font-semibold no-print">
-            <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
-              &ge; 97% (Sangat Baik)
-            </span>
-            <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>
-              95 - 96.9% (Normal)
-            </span>
-            <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
-              &lt; 95% (Evaluasi)
-            </span>
+
+          {/* Metric Toggle (Hidden in print) */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
+            <button
+              onClick={() => setTrendMetric('kehadiran')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                trendMetric === 'kehadiran'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+              }`}
+            >
+              📈 % Kehadiran Efektif
+            </button>
+            <button
+              onClick={() => setTrendMetric('ijin')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                trendMetric === 'ijin'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+              }`}
+            >
+              📉 % Izin / Waktu Hilang
+            </button>
           </div>
         </div>
 
-        {/* Visual Bar Graph */}
-        <div className="pt-2">
-          <div className="grid grid-cols-6 sm:grid-cols-12 gap-2 sm:gap-3 items-end min-h-[190px]">
-            {monthlyTrendData.map((item) => {
-              // Scale height relative to min 90% and max 100%
-              const minDisplay = 92;
-              const normalized = Math.max(0, Math.min(100, ((item.pctKehadiran - minDisplay) / (100 - minDisplay)) * 100));
-              const barHeightPct = Math.max(18, normalized);
+        {/* The SVG Line Chart Component (Styled exactly like Gambar 1) */}
+        <div className="overflow-x-auto py-2">
+          <div className="min-w-[760px] relative">
+            <svg
+              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+              className="w-full h-auto drop-shadow-xs"
+              style={{ overflow: 'visible' }}
+            >
+              <defs>
+                {/* Soft blue area gradient like Gambar 1 */}
+                <linearGradient id="area-blue-gradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.22" />
+                  <stop offset="70%" stopColor="#3b82f6" stopOpacity="0.06" />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+                </linearGradient>
 
-              let barColor = 'from-emerald-500 to-emerald-600 text-emerald-600';
-              if (item.pctKehadiran < 95) {
-                barColor = 'from-amber-500 to-amber-600 text-amber-600';
-              } else if (item.pctKehadiran < 97) {
-                barColor = 'from-blue-500 to-blue-600 text-blue-600';
-              }
+                {/* Drop shadow for floating badges */}
+                <filter id="badge-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.08" />
+                </filter>
+              </defs>
 
-              const isCurrentRange = item.bulanNum >= bulanAwal && item.bulanNum <= bulanAkhir;
+              {/* Horizontal Dashed Gridlines & Y-Axis Labels */}
+              {yTicks.map((tick, i) => (
+                <g key={i}>
+                  <line
+                    x1={padLeft - 5}
+                    y1={tick.y}
+                    x2={svgWidth - padRight}
+                    y2={tick.y}
+                    stroke="currentColor"
+                    strokeDasharray="4 4"
+                    strokeWidth="1"
+                    className="text-slate-200 dark:text-slate-800"
+                  />
+                  <text
+                    x={padLeft - 12}
+                    y={tick.y + 4}
+                    textAnchor="end"
+                    fontSize="11"
+                    fontFamily="monospace"
+                    className="fill-slate-400 dark:fill-slate-500 font-semibold"
+                  >
+                    {formatPctIndo(tick.val)}
+                  </text>
+                </g>
+              ))}
 
-              return (
-                <div
-                  key={item.bulanNum}
-                  className={`flex flex-col items-center justify-end h-full group transition-all ${
-                    isCurrentRange ? 'opacity-100' : 'opacity-40'
-                  }`}
-                >
-                  {/* Tooltip & Value Label */}
-                  <div className="text-[10px] font-mono font-black mb-1.5 text-slate-700 dark:text-slate-300 text-center">
-                    {item.totalIjinMenit > 0 ? `${item.pctKehadiran.toFixed(1)}%` : '100%'}
-                  </div>
+              {/* Shaded Area Fill */}
+              {areaPathD && (
+                <path d={areaPathD} fill="url(#area-blue-gradient)" />
+              )}
 
-                  {/* Bar Body */}
-                  <div className="w-full max-w-[38px] bg-slate-100 dark:bg-slate-800 rounded-xl p-1 flex flex-col justify-end h-[120px]">
-                    <div
-                      style={{ height: `${barHeightPct}%` }}
-                      className={`w-full rounded-lg bg-gradient-to-t ${barColor} shadow-xs transition-all duration-500 relative`}
-                    ></div>
-                  </div>
+              {/* Main Line Stroke (Thick Blue #2563eb) */}
+              {linePathD && (
+                <path
+                  d={linePathD}
+                  fill="none"
+                  stroke="#2563eb"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
 
-                  {/* Month Label */}
-                  <div className="mt-2 text-center">
-                    <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 block">
-                      {item.namaPendek}
-                    </span>
-                    <span className="text-[9px] font-mono text-slate-400 block leading-none">
-                      {item.totalIjinMenit > 0 ? `${Math.round(item.totalIjinMenit / 60)}j` : '0j'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+              {/* Circular Nodes at Each Point */}
+              {points.map((p, idx) => (
+                <g key={`point-${idx}`}>
+                  {/* Outer circle */}
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r="5.5"
+                    fill="#ffffff"
+                    stroke="#2563eb"
+                    strokeWidth="3"
+                  />
+                </g>
+              ))}
+
+              {/* Floating Badges with Exact Style as Gambar 1 */}
+              {points.map((p, idx) => {
+                const labelText = formatPctIndo(p.val);
+                // Stagger badge height slightly if adjacent points are close
+                const badgeOffsetY = idx % 2 === 0 ? 30 : 34;
+
+                return (
+                  <g key={`badge-${idx}`} transform={`translate(${p.x}, ${p.y - badgeOffsetY})`} filter="url(#badge-shadow)">
+                    {/* Badge container with blue border and rounded corners */}
+                    <rect
+                      x="-27"
+                      y="-12"
+                      width="54"
+                      height="21"
+                      rx="6"
+                      ry="6"
+                      fill="#ffffff"
+                      stroke="#2563eb"
+                      strokeWidth="1.5"
+                      className="dark:fill-slate-900"
+                    />
+                    {/* Badge text */}
+                    <text
+                      x="0"
+                      y="2.5"
+                      textAnchor="middle"
+                      fontSize="10"
+                      fontWeight="bold"
+                      fill="#1d4ed8"
+                      fontFamily="Arial, sans-serif"
+                      className="dark:fill-blue-400"
+                    >
+                      {labelText}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* X-Axis Month Labels */}
+              {points.map((p, idx) => {
+                const isSelected = p.month.bulanNum >= bulanAwal && p.month.bulanNum <= bulanAkhir;
+                return (
+                  <g key={`axis-${idx}`} transform={`translate(${p.x}, ${svgHeight - 15})`}>
+                    <text
+                      x="0"
+                      y="0"
+                      textAnchor="middle"
+                      fontSize="12"
+                      fontWeight={isSelected ? 'bold' : 'normal'}
+                      className={
+                        isSelected
+                          ? 'fill-slate-900 dark:fill-white font-bold'
+                          : 'fill-slate-400 dark:fill-slate-500'
+                      }
+                    >
+                      {p.month.namaPendek}
+                    </text>
+                    <text
+                      x="0"
+                      y="12"
+                      textAnchor="middle"
+                      fontSize="9"
+                      fontFamily="monospace"
+                      className="fill-slate-400 dark:fill-slate-500"
+                    >
+                      {p.month.totalIjinMenit > 0 ? `${Math.round(p.month.totalIjinMenit / 60)}j` : '0j'}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
           </div>
         </div>
 
@@ -411,13 +603,13 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
         <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 flex items-start gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
           <p className="leading-relaxed">
-            <strong>Analisis Disiplin Divisi:</strong> Tingkat kehadiran staf stabil rata-rata <strong>{kpiSummary.avgPct.toFixed(2)}%</strong> (di atas batas toleransi 95%). Puncak disiplin tertinggi terjadi pada bulan <strong>{kpiSummary.highestMonth}</strong>, sementara kenaikan frekuensi izin terjadi di bulan Juli–September seiring agenda sosial dan tradisi keluarga staf.
+            <strong>Analisis Tren Kehadiran Garis:</strong> Tingkat kehadiran staf stabil rata-rata <strong>{formatPctIndo(kpiSummary.avgPct)}</strong> (di atas batas toleransi 95%). Puncak disiplin tertinggi terjadi pada bulan <strong>{kpiSummary.highestMonth}</strong>, sementara kenaikan frekuensi izin terjadi di bulan Juli–September seiring agenda sosial dan tradisi keluarga staf.
           </p>
         </div>
       </div>
 
       {/* ============================================================== */}
-      {/* GRAFIS 2: RANKING KEHADIRAN STAFF (LEADERBOARD & PEMBINAAN)    */}
+      {/* 2. GRAFIK BALOK MENYAMPING RANKING KEHADIRAN SELURUH KARYAWAN  */}
       {/* ============================================================== */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -427,153 +619,177 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                Ranking &amp; Peringkat Kehadiran Staf (Evaluasi Tahunan)
+                Grafik Balok Peringkat Kehadiran Staf (Evaluasi Tahunan Seluruh Karyawan)
               </h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Peringkat staf terbaik (&ge; 95%) dan pemetaan staf yang memerlukan bimbingan kehadiran
+                Peringkat balok menyamping seluruh {staffRekapList.length} karyawan Divisi Produksi I berdasarkan persentase jam kerja
               </p>
             </div>
           </div>
 
-          {/* TOGGLE PILIHAN (DIBERI CLASS no-print AGAR TIDAK MUNCUL DI PDF) */}
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
-            <button
-              onClick={() => setRankingViewMode('terbaik')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                rankingViewMode === 'terbaik'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
-              }`}
+          {/* Search, Filter Unit & Sort (no-print) */}
+          <div className="flex flex-wrap items-center gap-2 no-print">
+            {/* Search Box */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Cari staf / NIP..."
+                value={searchStaff}
+                onChange={(e) => setSearchStaff(e.target.value)}
+                className="pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white w-44 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Filter Unit */}
+            <select
+              value={filterUnit}
+              onChange={(e) => setFilterUnit(e.target.value as any)}
+              className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-white cursor-pointer"
             >
-              🏆 Top 10 Terbaik
-            </button>
+              <option value="Semua">Semua Unit</option>
+              <option value="Operasional">Operasional</option>
+              <option value="Administrasi">Administrasi</option>
+            </select>
+
+            {/* Sort Toggle */}
             <button
-              onClick={() => setRankingViewMode('pembinaan')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                rankingViewMode === 'pembinaan'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
-              }`}
+              onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
+              className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+              title="Ubah Urutan Ranking"
             >
-              ⚠️ Perlu Pembinaan
+              <ArrowUpDown className="w-3.5 h-3.5" />
+              <span>{sortDirection === 'desc' ? 'Tertinggi (#1 → #32)' : 'Terendah (#32 → #1)'}</span>
             </button>
           </div>
         </div>
 
-        {/* ON-SCREEN VIEW (BERDASARKAN TOGGLE) */}
-        <div className="no-print space-y-2.5">
-          {rankingViewMode === 'terbaik' ? (
-            <div className="space-y-2">
-              <div className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 mb-1">
-                <span>10 Staf dengan Kehadiran Paling Sempurna &amp; Disiplin Tinggi</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {top10Terbaik.map((st, i) => {
-                  const badgeIcon = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
-                  return (
-                    <div
-                      key={st.nip}
-                      className="p-3 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 text-xs"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-extrabold flex items-center justify-center text-xs shrink-0">
-                          {badgeIcon}
-                        </span>
-                        <div className="truncate">
-                          <div className="font-bold text-slate-900 dark:text-white truncate">
-                            {st.nama}
-                          </div>
-                          <div className="text-[10px] text-slate-400 truncate">
-                            {st.nip} • {st.jabatan}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm">
-                          {st.pctKehadiran.toFixed(2)}%
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono">
-                          Ijin: {st.totalIjinPeriode} m
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+        {/* Legend Indicator */}
+        <div className="flex flex-wrap items-center gap-4 text-xs font-semibold pt-1 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+          <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+            &ge; 98.0% (Sangat Baik / Sempurna)
+          </span>
+          <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>
+            95.0% - 97.9% (Memenuhi Baku)
+          </span>
+          <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>
+            &lt; 95.0% (Perlu Pembinaan)
+          </span>
+          <span className="ml-auto text-slate-400 text-[11px] font-mono no-print">
+            Total {allStaffRanked.length} Staf Ditampilkan
+          </span>
+        </div>
+
+        {/* The Horizontal Bar Chart Rows (Balok Menyamping Seluruh Karyawan) */}
+        <div className="space-y-2.5 max-h-[620px] overflow-y-auto pr-1">
+          {allStaffRanked.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 text-xs">
+              Tidak ada karyawan yang cocok dengan kriteria pencarian.
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="text-xs font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5 mb-1">
-                <span>Staf dengan Akumulasi Jam Izin Terbanyak (Rekomendasi Konseling HR)</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {bottom10Pembinaan.map((st, i) => (
-                  <div
-                    key={st.nip}
-                    className="p-3 rounded-xl bg-red-50/40 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 flex items-center justify-between gap-3 text-xs"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="w-7 h-7 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 font-extrabold flex items-center justify-center text-xs shrink-0">
-                        #{i + 1}
-                      </span>
-                      <div className="truncate">
-                        <div className="font-bold text-slate-900 dark:text-white truncate">
-                          {st.nama}
-                        </div>
-                        <div className="text-[10px] text-slate-400 truncate">
-                          {st.nip} • {st.jabatan}
-                        </div>
+            allStaffRanked.map((st, idx) => {
+              // Calculate actual absolute rank
+              const originalRank = staffRekapList
+                .slice()
+                .sort((a, b) => b.pctKehadiran - a.pctKehadiran)
+                .findIndex((s) => s.nip === st.nip) + 1;
+
+              // Color gradient & theme based on percentage
+              let barGradient = 'from-emerald-500 to-teal-500';
+              let badgeColor = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300';
+              let statusText = 'Sangat Baik';
+
+              if (st.pctKehadiran >= 99.8) {
+                statusText = 'Sempurna 100%';
+                badgeColor = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700';
+              } else if (st.pctKehadiran >= 98.0) {
+                statusText = 'Sangat Baik';
+              } else if (st.pctKehadiran >= 95.0) {
+                barGradient = 'from-blue-500 to-indigo-500';
+                badgeColor = 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300';
+                statusText = 'Memenuhi Baku';
+              } else {
+                barGradient = 'from-rose-500 to-red-600';
+                badgeColor = 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800';
+                statusText = 'Perlu Pembinaan';
+              }
+
+              // Visual bar scaling (scale from 85% to 100% so differences are pronounced and visible)
+              const minDisplayPct = 85.0;
+              const scaledBarWidth = Math.max(
+                8,
+                Math.min(100, ((st.pctKehadiran - minDisplayPct) / (100 - minDisplayPct)) * 100)
+              );
+
+              return (
+                <div
+                  key={st.nip}
+                  className="p-2.5 sm:p-3 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800 transition-all flex flex-col md:flex-row md:items-center gap-2 md:gap-4 text-xs"
+                >
+                  {/* Rank & Identitas */}
+                  <div className="flex items-center gap-2.5 w-full md:w-64 shrink-0 min-w-0">
+                    <span
+                      className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${
+                        originalRank === 1
+                          ? 'bg-amber-400 text-slate-900 shadow-xs'
+                          : originalRank === 2
+                          ? 'bg-slate-300 text-slate-800 shadow-xs'
+                          : originalRank === 3
+                          ? 'bg-amber-700 text-amber-100 shadow-xs'
+                          : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {originalRank === 1 ? '🥇' : originalRank === 2 ? '🥈' : originalRank === 3 ? '🥉' : `#${originalRank}`}
+                    </span>
+                    <div className="truncate min-w-0">
+                      <div className="font-bold text-slate-900 dark:text-white truncate">
+                        {st.nama}
                       </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="font-mono font-black text-red-600 dark:text-red-400 text-sm">
-                        {st.pctKehadiran.toFixed(2)}%
-                      </div>
-                      <div className="text-[10px] text-red-500/80 font-mono font-semibold">
-                        Ijin: {Math.round(st.totalIjinPeriode / 60)} Jam ({st.totalIjinPeriode}m)
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                        {st.nip} • {st.jabatan}
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
+
+                  {/* Horizontal Bar (Balok Menyamping) */}
+                  <div className="flex-1 min-w-0 flex items-center gap-3">
+                    <div className="flex-1 bg-slate-200 dark:bg-slate-700/60 rounded-full h-4 overflow-hidden relative p-0.5">
+                      <div
+                        style={{ width: `${scaledBarWidth}%` }}
+                        className={`h-full rounded-full bg-gradient-to-r ${barGradient} transition-all duration-700 relative`}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Nilai Persentase, Jam Izin & Status Badge */}
+                  <div className="flex items-center justify-between md:justify-end gap-3 shrink-0 w-full md:w-56 text-right">
+                    <div className="text-left md:text-right">
+                      <span className="font-mono font-black text-sm text-slate-900 dark:text-white">
+                        {formatPctIndo(st.pctKehadiran)}
+                      </span>
+                      <span className="block text-[10px] text-slate-500 font-mono">
+                        {st.totalIjinPeriode > 0
+                          ? `Ijin: ${Math.round(st.totalIjinPeriode / 60)}j (${st.totalIjinPeriode}m)`
+                          : 'Ijin: 0 m'}
+                      </span>
+                    </div>
+
+                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold shrink-0 ${badgeColor}`}>
+                      {statusText}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
           )}
-        </div>
-
-        {/* PRINT / PDF VIEW (MUNCUL DUA-DUANYA SECARA RAPI DI CETAK PDF TANPA TOGGLE) */}
-        <div className="hidden print:grid grid-cols-2 gap-4 text-[10px]">
-          <div>
-            <div className="font-bold text-black border-b border-black pb-1 mb-2">
-              🏆 10 STAF KEHADIRAN TERBAIK (DI ATAS TARGET 95%)
-            </div>
-            <div className="space-y-1">
-              {top10Terbaik.map((st, idx) => (
-                <div key={st.nip} className="flex justify-between border-b border-dotted border-slate-300 pb-0.5">
-                  <span>{idx + 1}. {st.nama} ({st.nip})</span>
-                  <span className="font-mono font-bold">{st.pctKehadiran.toFixed(2)}% ({st.totalIjinPeriode}m)</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="font-bold text-black border-b border-black pb-1 mb-2">
-              ⚠️ STAF PERLU PEMBINAAN &amp; MONITORING KHUSUS
-            </div>
-            <div className="space-y-1">
-              {bottom10Pembinaan.map((st, idx) => (
-                <div key={st.nip} className="flex justify-between border-b border-dotted border-slate-300 pb-0.5">
-                  <span>{idx + 1}. {st.nama} ({st.nip})</span>
-                  <span className="font-mono font-bold text-red-600">{st.pctKehadiran.toFixed(2)}% ({Math.round(st.totalIjinPeriode / 60)}j)</span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 
       {/* ============================================================== */}
-      {/* TABEL MASTER DETAIL 12 BULAN (MATRIX REKAP LENGKAP)            */}
+      {/* 3. TABEL MASTER DETAIL 12 BULAN (MATRIX REKAP LENGKAP)         */}
       {/* ============================================================== */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/30">
@@ -607,8 +823,8 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-[11px]">
               {staffRekapList.map((st) => {
-                const isExcellent = st.pctKehadiran >= 95;
-                const isWarning = st.pctKehadiran < 90;
+                const isExcellent = st.pctKehadiran >= 98;
+                const isWarning = st.pctKehadiran < 95;
 
                 return (
                   <tr key={st.nip} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
@@ -638,10 +854,10 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
                             ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
                             : isWarning
                             ? 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300'
-                            : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                            : 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
                         }`}
                       >
-                        {st.pctKehadiran.toFixed(2)}%
+                        {formatPctIndo(st.pctKehadiran)}
                       </span>
                     </td>
                   </tr>
