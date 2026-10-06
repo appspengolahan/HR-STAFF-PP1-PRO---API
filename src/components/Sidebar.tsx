@@ -80,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }`}
     >
       {/* Top Brand Banner */}
-      <div className="h-16 flex items-center justify-between px-3 border-b border-slate-800 bg-slate-950/60">
+      <div className="h-14 flex items-center justify-between px-3 border-b border-slate-800 bg-slate-950/60">
         <div
           onClick={onOpenSwitchBoard}
           className="flex items-center gap-3 overflow-hidden cursor-pointer group"

@@ -416,7 +416,7 @@ export default function App() {
 
       {/* Main Viewport */}
       <div
-        className={`flex-1 flex flex-col transition-all duration-300 pt-16 pb-24 lg:pb-10 ${
+        className={`flex-1 flex flex-col transition-all duration-300 pt-14 pb-24 lg:pb-10 ${
           isDevSupervisorVisible ? 'mt-8' : ''
         } ${sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-64'}`}
       >
