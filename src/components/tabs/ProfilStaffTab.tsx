@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { StaffData, PresensiRecord, LinkArsip, AuthUser } from '../../types';
 import { formatRupiah, NAMA_BULAN_INDO } from '../../services/payrollEngine';
+import { formatTanggalDmy } from '../../utils/dateFormatter';
 
 interface ProfilStaffTabProps {
   staffList: StaffData[];
@@ -289,11 +290,11 @@ export const ProfilStaffTab: React.FC<ProfilStaffTabProps> = ({
               </div>
               <div>
                 <span className="text-slate-400 block text-[10px]">Awal PKWT</span>
-                <span className="font-mono">{currentStaff.awalPKWT || '-'}</span>
+                <span className="font-mono">{formatTanggalDmy(currentStaff.awalPKWT)}</span>
               </div>
               <div>
                 <span className="text-slate-400 block text-[10px]">Akhir PKWT</span>
-                <span className="font-mono">{currentStaff.akhirPKWT || '-'}</span>
+                <span className="font-mono">{formatTanggalDmy(currentStaff.akhirPKWT)}</span>
               </div>
               <div>
                 <span className="text-slate-400 block text-[10px]">Proyeksi Jabatan</span>

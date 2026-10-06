@@ -5,6 +5,7 @@ import { storageService } from '../../services/storageService';
 import { gasClient } from '../../services/gasClient';
 import { sheetSyncService } from '../../services/sheetSync';
 import { STANDALONE_GAS_SCRIPT } from '../../data/standaloneGasScript';
+import { formatWaktuWib } from '../../utils/dateFormatter';
 
 interface GasCenterModalProps {
   isOpen: boolean;
@@ -54,7 +55,7 @@ export const GasCenterModal: React.FC<GasCenterModalProps> = ({
         ...config,
         apiUrl: apiUrl.trim(),
         status: 'connected',
-        lastSyncTimestamp: new Date().toLocaleTimeString('id-ID'),
+        lastSyncTimestamp: formatWaktuWib(new Date(), true),
       };
       storageService.saveGasConfig(updated);
       onUpdateConfig(updated);

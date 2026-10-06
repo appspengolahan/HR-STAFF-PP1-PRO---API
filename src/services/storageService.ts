@@ -125,8 +125,9 @@ export const storageService = {
   // Presensi
   getPresensiList(): PresensiRecord[] {
     const list = readStorage<PresensiRecord[]>(KEYS.PRESENSI, INITIAL_PRESENSI_LIST);
-    const hasOct = list && list.some((p) => p.bulan === 10 && p.tahun === 2026);
-    if (!list || list.length < 300 || !hasOct) {
+    const agustinOct = list && list.find((p) => p.nip === 'BK-PP1-003' && p.bulan === 10 && p.tahun === 2026);
+    const isUpToDate = agustinOct && agustinOct.faktorPotongan === 0.5;
+    if (!list || list.length < 340 || !isUpToDate) {
       writeStorage(KEYS.PRESENSI, INITIAL_PRESENSI_LIST);
       return INITIAL_PRESENSI_LIST;
     }

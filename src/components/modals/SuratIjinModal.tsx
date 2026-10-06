@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Printer } from 'lucide-react';
 import { PresensiRecord, StaffData } from '../../types';
+import { formatTanggalIndo, formatTanggalDmy, getNamaHariIndo } from '../../utils/dateFormatter';
 
 interface SuratIjinModalProps {
   isOpen: boolean;
@@ -21,12 +22,7 @@ export const SuratIjinModal: React.FC<SuratIjinModalProps> = ({
     window.print();
   };
 
-  const now = new Date();
-  const BULAN_INDO = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
-  ];
-  const tglCetak = `${String(now.getDate()).padStart(2, '0')} ${BULAN_INDO[now.getMonth()]} ${now.getFullYear()}`;
+  const tglCetak = formatTanggalIndo(new Date());
 
   const durasiJam = Math.floor(record.durasiMenit / 60);
   const durasiMenitSisa = record.durasiMenit % 60;
@@ -154,7 +150,7 @@ export const SuratIjinModal: React.FC<SuratIjinModalProps> = ({
               <span className="font-semibold">Hari / Tanggal</span>
               <span>:</span>
               <span>
-                <strong>{record.hari}</strong>, {record.tanggal}
+                <strong>{record.hari || getNamaHariIndo(record.tanggal)}</strong>, {formatTanggalIndo(record.tanggal)} ({formatTanggalDmy(record.tanggal)})
               </span>
 
               <span className="font-semibold">Keperluan Ijin</span>

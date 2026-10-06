@@ -10,6 +10,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { MutasiRecord, StaffData } from '../../types';
+import { formatTanggalDmy } from '../../utils/dateFormatter';
 
 interface JadwalMutasiTabProps {
   mutasiList: MutasiRecord[];
@@ -115,7 +116,7 @@ export const JadwalMutasiTab: React.FC<JadwalMutasiTabProps> = ({
                 filtered.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                     <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-white">
-                      {item.tanggalEfektif}
+                      {formatTanggalDmy(item.tanggalEfektif)}
                     </td>
                     <td className="py-3 px-4">
                       <div className="font-bold text-slate-900 dark:text-white">{item.nama}</div>

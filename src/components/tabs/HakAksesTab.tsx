@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { AuthUser, DeletedArchiveRecord, UserRole } from '../../types';
 import { storageService } from '../../services/storageService';
+import { formatTanggalWaktuIndo } from '../../utils/dateFormatter';
 
 interface HakAksesTabProps {
   currentUser: AuthUser | null;
@@ -223,7 +224,7 @@ export const HakAksesTab: React.FC<HakAksesTabProps> = ({
                   deletedArchives.map((rec) => (
                     <tr key={rec.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                       <td className="py-3 px-4 text-slate-500">
-                        {new Date(rec.waktuDihapus).toLocaleString('id-ID')}
+                        {formatTanggalWaktuIndo(rec.waktuDihapus)}
                       </td>
                       <td className="py-3 px-4">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300">

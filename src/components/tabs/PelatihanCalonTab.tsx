@@ -10,6 +10,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { CalonKaryawan, StaffData } from '../../types';
+import { formatTanggalDmy } from '../../utils/dateFormatter';
 
 interface PelatihanCalonTabProps {
   calonList: CalonKaryawan[];
@@ -176,8 +177,8 @@ export const PelatihanCalonTab: React.FC<PelatihanCalonTabProps> = ({
                       {item.proyeksiJabatan}
                     </td>
                     <td className="py-3 px-4">{item.sekup}</td>
-                    <td className="py-3 px-4 font-mono">{item.tanggalMulai}</td>
-                    <td className="py-3 px-4 font-mono">{item.tanggalAkhir}</td>
+                    <td className="py-3 px-4 font-mono">{formatTanggalDmy(item.tanggalMulai)}</td>
+                    <td className="py-3 px-4 font-mono">{formatTanggalDmy(item.tanggalAkhir)}</td>
                     <td className="py-3 px-4 text-center">{item.durasiHari} Hari</td>
                     <td className="py-3 px-4 text-center">
                       <span

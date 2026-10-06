@@ -266,7 +266,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
               <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-1">
-                Total Ketentuan Gaji
+                Total Ketentuan ({bebanGaji.activeCount} Staff Aktif)
               </div>
               <div className="text-xl font-bold text-slate-900 dark:text-white">
                 {formatRupiah(bebanGaji.totalKetentuan)}
@@ -276,12 +276,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
             <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50">
               <div className="text-xs text-red-700 dark:text-red-400 font-semibold mb-1">
-                Total Potongan Ijin
+                Total Potongan Ijin ({NAMA_BULAN_INDO[bebanBulan - 1]} {bebanTahun})
               </div>
               <div className="text-xl font-bold text-red-600 dark:text-red-400">
-                - {formatRupiah(bebanGaji.totalPotongan)}
+                {formatRupiah(bebanGaji.totalPotongan)}
               </div>
-              <div className="text-[10px] text-red-500/80 mt-1">Akumulasi ijin 26h</div>
+              <div className="text-[10px] text-red-500/80 mt-1">Faktor Potongan Upah / 26h</div>
             </div>
 
             <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50">

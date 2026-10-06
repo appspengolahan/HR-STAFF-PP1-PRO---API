@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Printer, Send, Copy, Check, MessageSquare } from 'lucide-react';
 import { SlipGajiRecord, StaffData } from '../../types';
 import { formatRupiah } from '../../services/payrollEngine';
+import { formatTanggalWaktuIndo } from '../../utils/dateFormatter';
 
 interface ThermalSlipModalProps {
   isOpen: boolean;
@@ -194,7 +195,7 @@ _Dokumen digital resmi Divisi Produksi I - All Rights Reserved._`;
             </div>
 
             <div className="pt-2 text-center text-[8.5px] text-slate-600 leading-tight">
-              <div>Dicetak: {new Date().toLocaleDateString('id-ID')}</div>
+              <div>Dicetak: {formatTanggalWaktuIndo(new Date())}</div>
               <div>Divisi Produksi I - All Rights Reserved</div>
             </div>
           </div>

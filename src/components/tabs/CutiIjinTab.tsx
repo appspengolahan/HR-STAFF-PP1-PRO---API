@@ -10,6 +10,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { CutiRecord, StaffData, AuthUser } from '../../types';
+import { formatTanggalDmy } from '../../utils/dateFormatter';
 
 interface CutiIjinTabProps {
   cutiList: CutiRecord[];
@@ -38,11 +39,13 @@ export const CutiIjinTab: React.FC<CutiIjinTabProps> = ({
   const [formAlasan, setFormAlasan] = useState('');
 
   const filtered = useMemo(() => {
-    return cutiList.filter((c) => {
-      const matchStaff = isStaffOnly && currentUser ? c.nip === currentUser.nip : true;
-      const matchStatus = filterStatus === 'Semua' ? true : c.status === filterStatus;
-      return matchStaff && matchStatus;
-    });
+    return cutiList
+      .filter((c) => {
+        const matchStaff = isStaffOnly && currentUser ? c.nip === currentUser.nip : true;
+        const matchStatus = filterStatus === 'Semua' ? true : c.status === filterStatus;
+        return matchStaff && matchStatus;
+      })
+      .sort((a, b) => new Date(b.tanggalMulai).getTime() - new Date(a.tanggalMulai).getTime());
   }, [cutiList, isStaffOnly, currentUser, filterStatus]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -149,8 +152,8 @@ export const CutiIjinTab: React.FC<CutiIjinTabProps> = ({
                         {item.jenisCuti}
                       </span>
                     </td>
-                    <td className="py-3 px-4 font-mono">{item.tanggalMulai}</td>
-                    <td className="py-3 px-4 font-mono">{item.tanggalAkhir}</td>
+                    <td className="py-3 px-4 font-mono">{formatTanggalDmy(item.tanggalMulai)}</td>
+                    <td className="py-3 px-4 font-mono">{formatTanggalDmy(item.tanggalAkhir)}</td>
                     <td className="py-3 px-4 text-center font-bold">{item.durasiHari} Hari</td>
                     <td className="py-3 px-4 text-slate-600 dark:text-slate-300 max-w-xs truncate">
                       {item.alasan}

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { LemburRecord, StaffData } from '../../types';
 import { formatRupiah, NAMA_BULAN_INDO } from '../../services/payrollEngine';
+import { formatTanggalDmy } from '../../utils/dateFormatter';
 
 interface LemburTabProps {
   lemburList: LemburRecord[];
@@ -46,12 +47,14 @@ export const LemburTab: React.FC<LemburTabProps> = ({
 
   // Filtered recent lembur list
   const filteredList = useMemo(() => {
-    return lemburList.filter((item) => {
-      const matchTahun = item.tahun === filterTahun;
-      const matchBulan = item.bulan === filterBulan;
-      const matchStaff = isStaffPortal && currentUserNip ? item.nip === currentUserNip : true;
-      return matchTahun && matchBulan && matchStaff;
-    });
+    return lemburList
+      .filter((item) => {
+        const matchTahun = item.tahun === filterTahun;
+        const matchBulan = item.bulan === filterBulan;
+        const matchStaff = isStaffPortal && currentUserNip ? item.nip === currentUserNip : true;
+        return matchTahun && matchBulan && matchStaff;
+      })
+      .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
   }, [lemburList, filterTahun, filterBulan, isStaffPortal, currentUserNip]);
 
   // Summary Metrics
@@ -279,7 +282,7 @@ export const LemburTab: React.FC<LemburTabProps> = ({
               ) : (
                 filteredList.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                    <td className="py-3 px-4 font-mono font-medium">{row.tanggal}</td>
+                    <td className="py-3 px-4 font-mono font-medium">{formatTanggalDmy(row.tanggal)}</td>
                     <td className="py-3 px-4">
                       <div className="font-bold text-slate-900 dark:text-white">{row.nama}</div>
                       <div className="text-[10px] text-slate-500 font-mono">{row.nip}</div>

@@ -16,6 +16,7 @@ import {
 import { StaffData, MutasiRecord } from '../../types';
 import { formatRupiah } from '../../services/payrollEngine';
 import { PkwtAlertCard, parsePkwtDate } from '../PkwtAlertCard';
+import { formatTanggalIndo } from '../../utils/dateFormatter';
 
 interface DatabaseStaffTabProps {
   staffList: StaffData[];
@@ -260,7 +261,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
             MASTER DATABASE KARYAWAN &amp; STAF KANTOR (DIVISI PRODUKSI I)
           </div>
           <div className="text-xs text-center text-slate-600">
-            PT Batu Karang — Data Per Tanggal {new Date().toLocaleDateString('id-ID')}
+            PT Batu Karang — Data Per Tanggal {formatTanggalIndo(new Date(), true)}
           </div>
         </div>
 
