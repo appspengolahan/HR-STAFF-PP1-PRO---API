@@ -98,7 +98,9 @@ function doGet(e) {
             tunjanganJabatan: tj,
             totalGaji: gp + tj,
             statusPTKP: String(row[19] || "TK/0").trim(),
-            bpjsKesehatanNominal: Number(row[29]) || 0
+            domisili: String(row[20] || "Malang").trim(),
+            bpjsKesehatanNominal: Number(row[29]) || 0,
+            pendidikanTerakhir: String(row[30] || (String(row[4] || "").includes("Manajer") ? "S1" : "SMA/SMK")).trim()
           });
         }
       }

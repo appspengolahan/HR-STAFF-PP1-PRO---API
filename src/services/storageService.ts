@@ -81,6 +81,23 @@ export const storageService = {
       writeStorage(KEYS.STAFF, INITIAL_STAFF_LIST);
       return INITIAL_STAFF_LIST;
     }
+    // Verify each staff has pendidikanTerakhir
+    let needsUpdate = false;
+    const verified = list.map((st) => {
+      if (!st.pendidikanTerakhir) {
+        needsUpdate = true;
+        const initial = INITIAL_STAFF_LIST.find((init) => init.nip === st.nip);
+        return {
+          ...st,
+          pendidikanTerakhir: initial?.pendidikanTerakhir || (st.jabatan.includes('Manajer') ? 'S1' : 'SMA/SMK'),
+        } as StaffData;
+      }
+      return st;
+    });
+    if (needsUpdate) {
+      writeStorage(KEYS.STAFF, verified);
+      return verified;
+    }
     return list;
   },
   saveStaffList(list: StaffData[]): void {

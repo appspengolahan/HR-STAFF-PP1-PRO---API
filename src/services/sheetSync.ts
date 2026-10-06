@@ -48,6 +48,8 @@ export const sheetSyncService = {
     // 1. Fetch MASTER_STAFF
     const staffRows = await this.fetchLiveSheetCsv('MASTER_STAFF');
     const newStaff: StaffData[] = [];
+    const headers = staffRows[0] || [];
+    const pendColIdx = headers.findIndex((h) => h.toLowerCase().includes('pendidikan'));
 
     staffRows.slice(1).forEach((r, idx) => {
       if (r.length > 2 && r[2] && r[2] !== 'Nama') {
@@ -95,13 +97,34 @@ export const sheetSyncService = {
         const deskripsiJabatan = r[27] ? r[27].replace(/^"|"$/g, '').trim() : '';
         const faskes = r[28] ? r[28].replace(/^"|"$/g, '').trim() : '';
         const bpjsKesehatanNominal = parseRp(r[29]);
-        const rawPend = r[30] ? r[30].replace(/^"|"$/g, '').trim() : '';
-        const validPend = ['SD', 'SMP', 'SMA/SMK', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3'];
-        const pendidikanTerakhir: any = validPend.includes(rawPend)
-          ? rawPend
-          : jabatan.includes('Manajer') || jabatan.includes('Kepala')
-          ? 'S1'
-          : 'SMA/SMK';
+
+        // Dynamic lookup for Pendidikan Terakhir
+        const rawPend = (pendColIdx !== -1 && r[pendColIdx] ? r[pendColIdx] : r[30] || '').replace(/^"|"$/g, '').trim();
+        let pendidikanTerakhir: 'SD' | 'SMP' | 'SMA/SMK' | 'D1' | 'D2' | 'D3' | 'D4' | 'S1' | 'S2' | 'S3' = 'SMA/SMK';
+        const pendUpper = rawPend.toUpperCase();
+        if (pendUpper.includes('S3') || pendUpper.includes('DOKTOR')) {
+          pendidikanTerakhir = 'S3';
+        } else if (pendUpper.includes('S2') || pendUpper.includes('MAGISTER')) {
+          pendidikanTerakhir = 'S2';
+        } else if (pendUpper.includes('S1') || pendUpper.includes('SARJANA')) {
+          pendidikanTerakhir = 'S1';
+        } else if (pendUpper.includes('D4')) {
+          pendidikanTerakhir = 'D4';
+        } else if (pendUpper.includes('D3') || pendUpper.includes('DIPLOMA 3')) {
+          pendidikanTerakhir = 'D3';
+        } else if (pendUpper.includes('D2')) {
+          pendidikanTerakhir = 'D2';
+        } else if (pendUpper.includes('D1')) {
+          pendidikanTerakhir = 'D1';
+        } else if (pendUpper.includes('SMP') || pendUpper.includes('SLTP')) {
+          pendidikanTerakhir = 'SMP';
+        } else if (pendUpper.includes('SD')) {
+          pendidikanTerakhir = 'SD';
+        } else if (pendUpper.includes('SMA') || pendUpper.includes('SMK') || pendUpper.includes('SLTA')) {
+          pendidikanTerakhir = 'SMA/SMK';
+        } else if (jabatan.includes('Manajer') || jabatan.includes('Kepala')) {
+          pendidikanTerakhir = 'S1';
+        }
 
         newStaff.push({
           id,

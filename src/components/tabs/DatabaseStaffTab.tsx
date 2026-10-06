@@ -38,10 +38,27 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSekup, setFilterSekup] = useState<'Semua' | 'Operasional' | 'Administrasi'>('Semua');
   const [filterStatus, setFilterStatus] = useState<string>('Semua');
+  const [filterPendidikan, setFilterPendidikan] = useState<string>('Semua');
 
   // Modal State
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<StaffData | null>(null);
   const [selectedStaffForMutasi, setSelectedStaffForMutasi] = useState<StaffData | null>(null);
+
+  // Edit Staff Form State
+  const [editNama, setEditNama] = useState('');
+  const [editJabatan, setEditJabatan] = useState('');
+  const [editLevel, setEditLevel] = useState('Staff');
+  const [editSekup, setEditSekup] = useState<'Operasional' | 'Administrasi'>('Operasional');
+  const [editStatus, setEditStatus] = useState<'MAGANG' | 'PKWT 1' | 'PKWT 2' | 'PKWT 3' | 'PKWT 4' | 'PKWT 5' | 'PKWT 6' | 'PKWT 7' | 'TETAP'>('PKWT 1');
+  const [editPendidikan, setEditPendidikan] = useState<'SD' | 'SMP' | 'SMA/SMK' | 'D1' | 'D2' | 'D3' | 'D4' | 'S1' | 'S2' | 'S3'>('SMA/SMK');
+  const [editDomisili, setEditDomisili] = useState('Malang');
+  const [editTelp, setEditTelp] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editGp, setEditGp] = useState<number>(0);
+  const [editTunjangan, setEditTunjangan] = useState<number>(0);
+  const [editPtkp, setEditPtkp] = useState('TK/0');
 
   // New Staff Form State
   const [formNama, setFormNama] = useState('');
@@ -76,13 +93,53 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
     return staffList.filter((s) => {
       const matchSekup = filterSekup === 'Semua' ? true : s.sekup === filterSekup;
       const matchStatus = filterStatus === 'Semua' ? true : s.status === filterStatus;
+      const matchPendidikan = filterPendidikan === 'Semua' ? true : s.pendidikanTerakhir === filterPendidikan;
       const matchSearch =
         s.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.nip.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.jabatan.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchSekup && matchStatus && matchSearch;
+      return matchSekup && matchStatus && matchPendidikan && matchSearch;
     });
-  }, [staffList, filterSekup, filterStatus, searchQuery]);
+  }, [staffList, filterSekup, filterStatus, filterPendidikan, searchQuery]);
+
+  const handleOpenEdit = (st: StaffData) => {
+    setEditingStaff(st);
+    setEditNama(st.nama);
+    setEditJabatan(st.jabatan);
+    setEditLevel(st.level);
+    setEditSekup(st.sekup);
+    setEditStatus(st.status);
+    setEditPendidikan(st.pendidikanTerakhir || 'SMA/SMK');
+    setEditDomisili(st.domisili || 'Malang');
+    setEditTelp(st.telp || '');
+    setEditEmail(st.email || '');
+    setEditGp(st.gajiPokok || 0);
+    setEditTunjangan(st.tunjanganJabatan || 0);
+    setEditPtkp(st.statusPTKP || 'TK/0');
+    setIsEditOpen(true);
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStaff) return;
+    onUpdateStaff(editingStaff.nip, {
+      nama: editNama.trim(),
+      jabatan: editJabatan.trim(),
+      level: editLevel,
+      sekup: editSekup,
+      status: editStatus,
+      pendidikanTerakhir: editPendidikan,
+      domisili: editDomisili.trim(),
+      telp: editTelp.trim(),
+      email: editEmail.trim(),
+      gajiPokok: editGp,
+      tunjanganJabatan: editTunjangan,
+      totalGaji: editGp + editTunjangan,
+      statusPTKP: editPtkp,
+    });
+    setIsEditOpen(false);
+    setEditingStaff(null);
+  };
 
   const handleCreateStaff = (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,6 +292,22 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                 <option value="MAGANG">MAGANG</option>
               </select>
             </div>
+
+            <div>
+              <select
+                value={filterPendidikan}
+                onChange={(e) => setFilterPendidikan(e.target.value)}
+                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold"
+              >
+                <option value="Semua">Pendidikan: Semua</option>
+                <option value="S1">S1</option>
+                <option value="D4">D4</option>
+                <option value="D3">D3</option>
+                <option value="SMA/SMK">SMA/SMK</option>
+                <option value="SMP">SMP</option>
+                <option value="SD">SD</option>
+              </select>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -273,6 +346,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                 <th className="py-3 px-3 font-mono">NIP</th>
                 <th className="py-3 px-3">Nama Karyawan</th>
                 <th className="py-3 px-3">Jabatan &amp; Level</th>
+                <th className="py-3 px-3">Pendidikan</th>
                 <th className="py-3 px-3">Unit</th>
                 <th className="py-3 px-3">Status</th>
                 <th className="py-3 px-3 text-right">Gaji Pokok</th>
@@ -296,6 +370,11 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                     <td className="py-3 px-3">
                       <div className="font-semibold text-slate-800 dark:text-slate-200">{st.jabatan}</div>
                       <div className="text-[10px] text-slate-400">{st.level}</div>
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-mono">
+                        {st.pendidikanTerakhir || '-'}
+                      </span>
                     </td>
                     <td className="py-3 px-3">{st.sekup}</td>
                     <td className="py-3 px-3">
@@ -347,6 +426,14 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                           className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-lg text-[11px] font-semibold transition-colors"
                         >
                           Profil
+                        </button>
+                        <button
+                          onClick={() => handleOpenEdit(st)}
+                          title="Edit Data Staf & Pendidikan Terakhir"
+                          className="px-2.5 py-1 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                          Edit
                         </button>
                         <button
                           onClick={() => {
@@ -686,6 +773,207 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                   className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shadow-sm"
                 >
                   Simpan Mutasi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Data Staf (Termasuk Pendidikan Terakhir) */}
+      {isEditOpen && editingStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">
+                    Edit Data Staf: {editingStaff.nama}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                    NIP: {editingStaff.nip}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsEditOpen(false);
+                  setEditingStaff(null);
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-6 overflow-y-auto space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1">Nama Lengkap</label>
+                  <input
+                    type="text"
+                    required
+                    value={editNama}
+                    onChange={(e) => setEditNama(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1 text-blue-600 dark:text-blue-400">
+                    Pendidikan Terakhir *
+                  </label>
+                  <select
+                    value={editPendidikan}
+                    onChange={(e) => setEditPendidikan(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-blue-400 dark:border-blue-600 rounded-lg font-bold"
+                  >
+                    <option value="SD">SD</option>
+                    <option value="SMP">SMP</option>
+                    <option value="SMA/SMK">SMA/SMK</option>
+                    <option value="D1">D1</option>
+                    <option value="D2">D2</option>
+                    <option value="D3">D3</option>
+                    <option value="D4">D4</option>
+                    <option value="S1">S1</option>
+                    <option value="S2">S2</option>
+                    <option value="S3">S3</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1">Jabatan Resmi</label>
+                  <input
+                    type="text"
+                    required
+                    value={editJabatan}
+                    onChange={(e) => setEditJabatan(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Level / Grade</label>
+                  <input
+                    type="text"
+                    value={editLevel}
+                    onChange={(e) => setEditLevel(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1">Unit / Sekup Kerja</label>
+                  <select
+                    value={editSekup}
+                    onChange={(e) => setEditSekup(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg"
+                  >
+                    <option value="Operasional">Operasional</option>
+                    <option value="Administrasi">Administrasi</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Status Kepegawaian</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg"
+                  >
+                    <option value="TETAP">TETAP</option>
+                    <option value="PKWT 1">PKWT 1</option>
+                    <option value="PKWT 2">PKWT 2</option>
+                    <option value="PKWT 3">PKWT 3</option>
+                    <option value="PKWT 4">PKWT 4</option>
+                    <option value="PKWT 5">PKWT 5</option>
+                    <option value="PKWT 6">PKWT 6</option>
+                    <option value="PKWT 7">PKWT 7</option>
+                    <option value="MAGANG">MAGANG</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1">Domisili</label>
+                  <input
+                    type="text"
+                    value={editDomisili}
+                    onChange={(e) => setEditDomisili(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Telepon / WhatsApp</label>
+                  <input
+                    type="text"
+                    value={editTelp}
+                    onChange={(e) => setEditTelp(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800">
+                <div>
+                  <label className="block font-semibold mb-1">Gaji Pokok (Rp)</label>
+                  <input
+                    type="number"
+                    value={editGp}
+                    onChange={(e) => setEditGp(Number(e.target.value) || 0)}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border rounded-lg font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Tunjangan Jabatan (Rp)</label>
+                  <input
+                    type="number"
+                    value={editTunjangan}
+                    onChange={(e) => setEditTunjangan(Number(e.target.value) || 0)}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border rounded-lg font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Status PTKP</label>
+                  <input
+                    type="text"
+                    value={editPtkp}
+                    onChange={(e) => setEditPtkp(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border rounded-lg font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditOpen(false);
+                    setEditingStaff(null);
+                  }}
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-semibold"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-sm"
+                >
+                  Simpan Perubahan
                 </button>
               </div>
             </form>

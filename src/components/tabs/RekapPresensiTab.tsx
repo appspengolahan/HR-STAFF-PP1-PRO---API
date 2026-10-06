@@ -43,7 +43,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
   // Search & Filter state for Ranking Balok
   const [searchStaff, setSearchStaff] = useState('');
   const [filterUnit, setFilterUnit] = useState<'Semua' | 'Operasional' | 'Administrasi'>('Semua');
-  const [sortDirection, setSortDirection] = useState<'desc' | 'asc'>('desc'); // desc = tertinggi ke terendah
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc'); // asc = terendah / perlu perhatian (merah) di atas, sempurna di bawah
 
   // Toggle for Line Trend Chart Metric
   const [trendMetric, setTrendMetric] = useState<'kehadiran' | 'ijin'>('kehadiran');
@@ -622,7 +622,9 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
                 Grafik Balok Peringkat Kehadiran Staf (Evaluasi Tahunan Seluruh Karyawan)
               </h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Peringkat balok menyamping seluruh {staffRekapList.length} karyawan Divisi Produksi I berdasarkan persentase jam kerja
+                {sortDirection === 'asc'
+                  ? `Urutan Evaluasi Pembinaan: Karyawan paling perlu perhatian (warna merah) berada di atas, menuju tingkat kehadiran sempurna (hijau) di bawah (${staffRekapList.length} Staf)`
+                  : `Urutan Prestasi Kehadiran: Karyawan dengan tingkat kehadiran tertinggi (warna hijau) berada di atas (${staffRekapList.length} Staf)`}
               </p>
             </div>
           </div>
@@ -654,29 +656,33 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
 
             {/* Sort Toggle */}
             <button
-              onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
+              onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
               className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
-              title="Ubah Urutan Ranking"
+              title="Ubah Urutan Balok Ranking"
             >
               <ArrowUpDown className="w-3.5 h-3.5" />
-              <span>{sortDirection === 'desc' ? 'Tertinggi (#1 → #32)' : 'Terendah (#32 → #1)'}</span>
+              <span>
+                {sortDirection === 'asc'
+                  ? 'Perlu Perhatian Teratas (Merah → Hijau)'
+                  : 'Paling Sempurna Teratas (Hijau → Merah)'}
+              </span>
             </button>
           </div>
         </div>
 
         {/* Legend Indicator */}
         <div className="flex flex-wrap items-center gap-4 text-xs font-semibold pt-1 border-b border-slate-100 dark:border-slate-800 pb-2.5">
-          <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
-            &ge; 98.0% (Sangat Baik / Sempurna)
+          <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>
+            &lt; 95.0% (Perlu Pembinaan / Perhatian)
           </span>
           <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
             <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>
             95.0% - 97.9% (Memenuhi Baku)
           </span>
-          <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>
-            &lt; 95.0% (Perlu Pembinaan)
+          <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+            &ge; 98.0% (Sangat Baik / Sempurna)
           </span>
           <span className="ml-auto text-slate-400 text-[11px] font-mono no-print">
             Total {allStaffRanked.length} Staf Ditampilkan
@@ -691,7 +697,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
             </div>
           ) : (
             allStaffRanked.map((st, idx) => {
-              // Calculate actual absolute rank
+              // Calculate actual absolute rank (descending rank)
               const originalRank = staffRekapList
                 .slice()
                 .sort((a, b) => b.pctKehadiran - a.pctKehadiran)
@@ -717,6 +723,40 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
                 statusText = 'Perlu Pembinaan';
               }
 
+              // Dynamic badge style and content based on sorting order
+              let rankBadgeClass = 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300';
+              let rankContent: React.ReactNode = `#${idx + 1}`;
+
+              if (sortDirection === 'asc') {
+                if (st.pctKehadiran < 95.0) {
+                  rankBadgeClass = 'bg-rose-500 text-white font-black shadow-xs ring-1 ring-rose-400';
+                  rankContent = `#${idx + 1}`;
+                } else if (st.pctKehadiran >= 99.8) {
+                  rankBadgeClass = 'bg-emerald-500 text-white font-black shadow-xs';
+                  rankContent = '🥇';
+                } else if (st.pctKehadiran >= 98.0) {
+                  rankBadgeClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold';
+                  rankContent = `#${idx + 1}`;
+                } else {
+                  rankBadgeClass = 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 font-bold';
+                  rankContent = `#${idx + 1}`;
+                }
+              } else {
+                if (originalRank === 1) {
+                  rankBadgeClass = 'bg-amber-400 text-slate-900 shadow-xs font-black';
+                  rankContent = '🥇';
+                } else if (originalRank === 2) {
+                  rankBadgeClass = 'bg-slate-300 text-slate-800 shadow-xs font-black';
+                  rankContent = '🥈';
+                } else if (originalRank === 3) {
+                  rankBadgeClass = 'bg-amber-700 text-amber-100 shadow-xs font-black';
+                  rankContent = '🥉';
+                } else {
+                  rankBadgeClass = 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300';
+                  rankContent = `#${originalRank}`;
+                }
+              }
+
               // Visual bar scaling (scale from 85% to 100% so differences are pronounced and visible)
               const minDisplayPct = 85.0;
               const scaledBarWidth = Math.max(
@@ -732,17 +772,10 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
                   {/* Rank & Identitas */}
                   <div className="flex items-center gap-2.5 w-full md:w-64 shrink-0 min-w-0">
                     <span
-                      className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${
-                        originalRank === 1
-                          ? 'bg-amber-400 text-slate-900 shadow-xs'
-                          : originalRank === 2
-                          ? 'bg-slate-300 text-slate-800 shadow-xs'
-                          : originalRank === 3
-                          ? 'bg-amber-700 text-amber-100 shadow-xs'
-                          : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                      }`}
+                      className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${rankBadgeClass}`}
+                      title={sortDirection === 'asc' ? `Urutan Prioritas #${idx + 1}` : `Peringkat #${originalRank}`}
                     >
-                      {originalRank === 1 ? '🥇' : originalRank === 2 ? '🥈' : originalRank === 3 ? '🥉' : `#${originalRank}`}
+                      {rankContent}
                     </span>
                     <div className="truncate min-w-0">
                       <div className="font-bold text-slate-900 dark:text-white truncate">
