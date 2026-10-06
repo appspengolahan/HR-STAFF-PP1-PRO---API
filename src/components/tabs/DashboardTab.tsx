@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { StaffData, PresensiRecord, LemburRecord } from '../../types';
 import { formatRupiah, NAMA_BULAN_INDO } from '../../services/payrollEngine';
+import { PkwtAlertCard } from '../PkwtAlertCard';
 
 interface DashboardTabProps {
   staffList: StaffData[];
@@ -112,30 +113,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     };
   }, [filteredStaff, presensiList, bebanBulan, bebanTahun]);
 
-  // PKWT Alerts (Sisa Hari <= 26)
-  const pkwtAlerts = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    return staffList
-      .filter((s) => s.statusAktif === 'Aktif' && s.status !== 'TETAP' && s.akhirPKWT && s.akhirPKWT.includes('-'))
-      .map((s) => {
-        const tglAkhir = new Date(s.akhirPKWT!);
-        const diffMs = tglAkhir.getTime() - today.getTime();
-        const sisaHari = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-        return {
-          nama: s.nama,
-          nip: s.nip,
-          jabatan: s.jabatan,
-          akhirPKWT: s.akhirPKWT!,
-          sisaHari,
-          isUrgent: sisaHari <= 7,
-        };
-      })
-      .filter((item) => item.sisaHari <= 26)
-      .sort((a, b) => a.sisaHari - b.sisaHari);
-  }, [staffList]);
-
   // Check GPS Geofence
   const handleCheckGeofence = () => {
     if (!navigator.geolocation) {
@@ -174,60 +151,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Alert PKWT jika ada */}
-      {pkwtAlerts.length > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 sm:p-5 shadow-xs">
-          <div className="flex items-center gap-2 mb-3 text-amber-700 dark:text-amber-400 font-bold text-sm">
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
-            <span>Peringatan Masa Berlaku PKWT Segera Berakhir (&le; 26 Hari)</span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="border-b border-amber-500/20 text-slate-600 dark:text-slate-300 font-semibold">
-                  <th className="pb-2">NIP &amp; Nama Staf</th>
-                  <th className="pb-2">Jabatan</th>
-                  <th className="pb-2">Tanggal Berakhir</th>
-                  <th className="pb-2">Sisa Waktu</th>
-                  <th className="pb-2 text-right">Tindakan</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-amber-500/10">
-                {pkwtAlerts.map((st) => (
-                  <tr key={st.nip} className="hover:bg-amber-500/5">
-                    <td className="py-2.5 font-bold text-slate-800 dark:text-white">
-                      {st.nama}{' '}
-                      <span className="font-mono text-[10px] text-slate-500">({st.nip})</span>
-                    </td>
-                    <td className="py-2.5 text-slate-600 dark:text-slate-300">{st.jabatan}</td>
-                    <td className="py-2.5 font-mono">{st.akhirPKWT}</td>
-                    <td className="py-2.5">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          st.isUrgent
-                            ? 'bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 animate-pulse'
-                            : 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
-                        }`}
-                      >
-                        {st.sisaHari <= 0 ? 'Sudah Berakhir' : `${st.sisaHari} Hari Lagi`}
-                      </span>
-                    </td>
-                    <td className="py-2.5 text-right">
-                      <button
-                        onClick={() => onNavigateTab('mutasi')}
-                        className="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-semibold transition-colors"
-                      >
-                        Perpanjang / Mutasi
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {/* Alert PKWT jika ada (<= 26 Hari) */}
+      <PkwtAlertCard
+        staffList={staffList}
+        onActionClick={() => onNavigateTab('mutasi')}
+        actionLabel="Perpanjang / Mutasi"
+      />
 
       {/* Primary KPI Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">

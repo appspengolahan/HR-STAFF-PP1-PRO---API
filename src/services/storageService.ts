@@ -124,7 +124,13 @@ export const storageService = {
 
   // Presensi
   getPresensiList(): PresensiRecord[] {
-    return readStorage<PresensiRecord[]>(KEYS.PRESENSI, INITIAL_PRESENSI_LIST);
+    const list = readStorage<PresensiRecord[]>(KEYS.PRESENSI, INITIAL_PRESENSI_LIST);
+    const hasOct = list && list.some((p) => p.bulan === 10 && p.tahun === 2026);
+    if (!list || list.length < 300 || !hasOct) {
+      writeStorage(KEYS.PRESENSI, INITIAL_PRESENSI_LIST);
+      return INITIAL_PRESENSI_LIST;
+    }
+    return list;
   },
   savePresensiList(list: PresensiRecord[]): void {
     writeStorage(KEYS.PRESENSI, list);

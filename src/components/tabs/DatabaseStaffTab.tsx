@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { StaffData, MutasiRecord } from '../../types';
 import { formatRupiah } from '../../services/payrollEngine';
+import { PkwtAlertCard, parsePkwtDate } from '../PkwtAlertCard';
 
 interface DatabaseStaffTabProps {
   staffList: StaffData[];
@@ -178,6 +179,19 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Alert PKWT Segera Berakhir (<= 26 Hari) */}
+      <PkwtAlertCard
+        staffList={staffList}
+        onActionClick={(nip) => {
+          const st = staffList.find((s) => s.nip === nip);
+          if (st) {
+            setSelectedStaffForMutasi(st);
+            setMutNilaiBaru(st.jabatan);
+          }
+        }}
+        actionLabel="Perpanjang / Mutasi"
+      />
+
       {/* Top Main Card */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
         {/* Controls */}
@@ -299,7 +313,30 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                     </td>
                     <td className="py-3 px-3 font-mono text-[11px]">{st.statusPTKP}</td>
                     <td className="py-3 px-3 font-mono text-[11px]">
-                      {st.akhirPKWT || '-'}
+                      <div>{st.akhirPKWT || '-'}</div>
+                      {!isTetap && st.akhirPKWT && (() => {
+                        const date = parsePkwtDate(st.akhirPKWT);
+                        if (date) {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          date.setHours(0, 0, 0, 0);
+                          const diff = Math.round((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                          if (diff <= 26) {
+                            return (
+                              <span
+                                className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  diff < 0
+                                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                }`}
+                              >
+                                {diff} hari
+                              </span>
+                            );
+                          }
+                        }
+                        return null;
+                      })()}
                     </td>
                     <td className="py-3 px-3 text-right no-print">
                       <div className="flex items-center justify-end gap-1.5">

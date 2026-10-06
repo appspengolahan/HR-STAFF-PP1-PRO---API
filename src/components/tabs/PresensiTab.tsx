@@ -84,20 +84,45 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
     return 0;
   };
 
-  // Filtered List
-  const filteredList = useMemo(() => {
-    return presensiList.filter((item) => {
-      const matchBulan = item.bulan === filterBulan;
-      const matchTahun = item.tahun === filterTahun;
-      const matchStaff = isStaffPortal
-        ? item.nip === currentUserNip
-        : filterNama ? item.nip === filterNama : true;
-      const matchSearch =
-        item.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.keperluan && item.keperluan.toLowerCase().includes(searchQuery.toLowerCase()));
+  // Helper to format date as DD/MM/YYYY
+  const formatTanggalDisplay = (tgl: string): string => {
+    if (!tgl) return '-';
+    if (tgl.includes('/')) return tgl;
+    const parts = tgl.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return tgl;
+  };
 
-      return matchBulan && matchTahun && matchStaff && matchSearch;
-    });
+  // Filtered List - Sorted Descending by Date (Terbaru di paling atas, terlama di paling bawah)
+  const filteredList = useMemo(() => {
+    return presensiList
+      .filter((item) => {
+        const matchBulan = item.bulan === filterBulan;
+        const matchTahun = item.tahun === filterTahun;
+        const matchStaff = isStaffPortal
+          ? item.nip === currentUserNip
+          : filterNama ? item.nip === filterNama : true;
+        const matchSearch =
+          item.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (item.keperluan && item.keperluan.toLowerCase().includes(searchQuery.toLowerCase()));
+
+        return matchBulan && matchTahun && matchStaff && matchSearch;
+      })
+      .sort((a, b) => {
+        const getTime = (dStr: string) => {
+          if (!dStr) return 0;
+          if (dStr.includes('/')) {
+            const p = dStr.split('/');
+            return new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0])).getTime();
+          }
+          return new Date(dStr).getTime();
+        };
+        const diff = getTime(b.tanggal) - getTime(a.tanggal);
+        if (diff !== 0) return diff;
+        return (b.rowNum || 0) - (a.rowNum || 0);
+      });
   }, [presensiList, filterBulan, filterTahun, filterNama, searchQuery, isStaffPortal, currentUserNip]);
 
   const handleSubmitForm = (e: React.FormEvent) => {
@@ -335,7 +360,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
 
                   return (
                     <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                      <td className="py-3 px-4 font-mono font-medium">{row.tanggal}</td>
+                      <td className="py-3 px-4 font-mono font-medium">{formatTanggalDisplay(row.tanggal)}</td>
                       <td className="py-3 px-4">{row.hari}</td>
                       <td className="py-3 px-4">
                         <div className="font-bold text-slate-900 dark:text-white">{row.nama}</div>

@@ -208,13 +208,22 @@ export const sheetSyncService = {
             else faktor = 1;
           }
 
+          const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+          let hariName = 'Hari';
+          try {
+            const dt = new Date(isoTgl);
+            if (!isNaN(dt.getTime())) {
+              hariName = dayNames[dt.getDay()];
+            }
+          } catch (_) {}
+
           const st = newStaff.find((s) => s.nama === nama);
 
           newPresensi.push({
             id: `pr-${idx + 1}`,
             rowNum: idx + 6,
             tanggal: isoTgl,
-            hari: 'Hari',
+            hari: hariName,
             nip: st?.nip || 'BK-PP1-999',
             nama,
             jamAwal,
