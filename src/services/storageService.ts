@@ -145,6 +145,14 @@ export const storageService = {
     const list = this.getPresensiList();
     this.savePresensiList([...records, ...list]);
   },
+  updatePresensi(id: string, updatedRec: Partial<PresensiRecord>): void {
+    const list = this.getPresensiList();
+    const idx = list.findIndex((p) => p.id === id);
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], ...updatedRec };
+      this.savePresensiList(list);
+    }
+  },
   deletePresensi(id: string, deletedBy: string): void {
     const list = this.getPresensiList();
     const target = list.find((p) => p.id === id);

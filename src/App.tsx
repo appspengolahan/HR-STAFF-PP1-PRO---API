@@ -271,6 +271,11 @@ export default function App() {
     setPresensiList(storageService.getPresensiList());
   };
 
+  const handleUpdatePresensi = (id: string, updatedRec: Partial<PresensiRecord>) => {
+    storageService.updatePresensi(id, updatedRec);
+    setPresensiList(storageService.getPresensiList());
+  };
+
   // Handlers for Lembur
   const handleAddLemburBatch = (records: LemburRecord[]) => {
     storageService.addLemburBatch(records);
@@ -437,6 +442,7 @@ export default function App() {
               staffList={staffList}
               onAddPresensi={handleAddPresensi}
               onAddPresensiBatch={handleAddPresensiBatch}
+              onUpdatePresensi={handleUpdatePresensi}
               onDeletePresensi={handleDeletePresensi}
               currentUserNip={currentUser?.nip}
               isStaffPortal={currentUser?.portalType === 'staff'}
