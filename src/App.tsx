@@ -20,6 +20,7 @@ import {
 } from './types';
 import { storageService } from './services/storageService';
 import { gasClient } from './services/gasClient';
+import { sheetSyncService } from './services/sheetSync';
 import { RoleSimulatorBar } from './components/RoleSimulatorBar';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -93,24 +94,40 @@ export default function App() {
       try {
         setIsSyncingPresensi(true);
         const cfg = storageService.getGasConfig();
-        if (!cfg.apiUrl) return;
+        const hasValidStaffGasUrl =
+          cfg.apiUrl &&
+          !cfg.apiUrl.includes('AKfycbzGZsSs2ZviyLMM0csjmMDXZDMpC9ZhuvheEb97g9KM1AZW8mlhSUPBc8o8YJp_9zg');
 
-        const res = await gasClient.fetchPresensi(cfg.apiUrl, staffList);
-        if (res.status === 'success' && res.data && res.data.length > 0) {
-          storageService.savePresensiList(res.data);
-          setPresensiList(res.data);
-          const octCount = res.data.filter((r) => r.bulan === 10 && r.tahun === 2026).length;
+        if (hasValidStaffGasUrl) {
+          const res = await gasClient.fetchPresensi(cfg.apiUrl, staffList);
+          if (res.status === 'success' && res.data && res.data.length > 0) {
+            storageService.savePresensiList(res.data);
+            setPresensiList(res.data);
+            const octCount = res.data.filter((r) => r.bulan === 10 && r.tahun === 2026).length;
+            if (!isSilent) {
+              setSyncToastMessage(
+                `✓ Berhasil sinkronisasi ${res.count} data presensi staf live dari GAS (${octCount} data di Oktober 2026, termasuk Matsukri 7 Okt)!`
+              );
+              setTimeout(() => setSyncToastMessage(null), 6000);
+            }
+          }
+        } else {
+          // Tarik data langsung dari Google Sheets Asli HR Staff (1KzEFolz...)
+          const syncRes = await sheetSyncService.syncAllFromLiveSheet();
+          const latestPresensi = storageService.getPresensiList();
+          setPresensiList(latestPresensi);
+          setStaffList(storageService.getStaffList());
           if (!isSilent) {
             setSyncToastMessage(
-              `✓ Berhasil sinkronisasi ${res.count} data presensi live dari GAS (${octCount} data di Oktober 2026, termasuk Matsukri 7 Okt)!`
+              `✓ Berhasil sinkronisasi ${syncRes.presensiCount} data presensi dari Google Sheet Staff Asli (Termasuk Matsukri 7 Okt)!`
             );
             setTimeout(() => setSyncToastMessage(null), 6000);
           }
         }
       } catch (err) {
-        console.warn('Gagal background sync presensi GAS:', err);
+        console.warn('Gagal sync presensi staf:', err);
         if (!isSilent) {
-          setSyncToastMessage(`Gagal menarik data GAS: ${err instanceof Error ? err.message : String(err)}`);
+          setSyncToastMessage(`Gagal menarik data: ${err instanceof Error ? err.message : String(err)}`);
           setTimeout(() => setSyncToastMessage(null), 5000);
         }
       } finally {

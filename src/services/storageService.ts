@@ -348,13 +348,24 @@ export const storageService = {
   // GAS Config
   getGasConfig(): GasConfig {
     const fallback: GasConfig = {
-      apiUrl:
-        'https://script.google.com/macros/s/AKfycbzGZsSs2ZviyLMM0csjmMDXZDMpC9ZhuvheEb97g9KM1AZW8mlhSUPBc8o8YJp_9zg/exec',
+      apiUrl: '',
       isAutoSync: false,
       status: 'idle',
       lastSyncTimestamp: new Date().toLocaleTimeString('id-ID'),
     };
-    return readStorage<GasConfig>(KEYS.GAS_CONFIG, fallback);
+    const stored = readStorage<GasConfig>(KEYS.GAS_CONFIG, fallback);
+    // Jika tersimpan URL lama HR Pekerja (AKfycbz... / spreadsheet 11NpDy...), bersihkan otomatis agar data tidak tertukar
+    if (stored && stored.apiUrl && stored.apiUrl.includes('AKfycbzGZsSs2ZviyLMM0csjmMDXZDMpC9ZhuvheEb97g9KM1AZW8mlhSUPBc8o8YJp_9zg')) {
+      const cleaned: GasConfig = {
+        ...stored,
+        apiUrl: '',
+        status: 'idle',
+        errorMessage: 'URL sebelumnya adalah endpoint HR Pekerja Pabrik. Gunakan Live Sheet Sync (1KzEFolz...) untuk data HR Staff.',
+      };
+      writeStorage(KEYS.GAS_CONFIG, cleaned);
+      return cleaned;
+    }
+    return stored;
   },
   saveGasConfig(cfg: GasConfig): void {
     writeStorage(KEYS.GAS_CONFIG, cfg);

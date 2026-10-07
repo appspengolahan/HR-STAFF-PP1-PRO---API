@@ -13,6 +13,12 @@ const INDO_DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu
 export const gasClient = {
   async ping(apiUrl: string): Promise<GasResponse> {
     if (!apiUrl) throw new Error('URL API Google Apps Script belum dikonfigurasi');
+    if (apiUrl.includes('AKfycbzGZsSs2ZviyLMM0csjmMDXZDMpC9ZhuvheEb97g9KM1AZW8mlhSUPBc8o8YJp_9zg')) {
+      return {
+        status: 'error',
+        message: 'Peringatan: URL ini terhubung ke Spreadsheet HR Pekerja Pabrik (11NpDy...), BUKAN HR Staff (1KzEFolz...). Data pekerja tidak boleh tertukar dengan data staf.',
+      };
+    }
     const endpoint = `${apiUrl}?action=ping`;
     const res = await fetch(endpoint, {
       method: 'GET',
@@ -23,6 +29,9 @@ export const gasClient = {
   },
 
   async fetchStaff(apiUrl: string): Promise<GasResponse<StaffData[]>> {
+    if (apiUrl.includes('AKfycbzGZsSs2ZviyLMM0csjmMDXZDMpC9ZhuvheEb97g9KM1AZW8mlhSUPBc8o8YJp_9zg')) {
+      throw new Error('URL ini adalah endpoint HR Pekerja Pabrik, bukan HR Staff.');
+    }
     const endpoint = `${apiUrl}?action=get_staff`;
     const res = await fetch(endpoint, {
       method: 'GET',
@@ -34,6 +43,11 @@ export const gasClient = {
 
   async fetchPresensi(apiUrl: string, staffList?: StaffData[]): Promise<GasResponse<PresensiRecord[]>> {
     if (!apiUrl) throw new Error('URL API Google Apps Script belum dikonfigurasi');
+    if (apiUrl.includes('AKfycbzGZsSs2ZviyLMM0csjmMDXZDMpC9ZhuvheEb97g9KM1AZW8mlhSUPBc8o8YJp_9zg')) {
+      throw new Error(
+        'Peringatan: URL ini terhubung ke Spreadsheet HR Pekerja Pabrik (11NpDy...). Aplikasi ini adalah portal HR Staff (1KzEFolz...). Mohon gunakan sinkronisasi spreadsheet staff langsung.'
+      );
+    }
 
     // 1. Coba endpoint action getPresensi (camelCase pada GAS produksi aktif)
     let rawJson: any = null;

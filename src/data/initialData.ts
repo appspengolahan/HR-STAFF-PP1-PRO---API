@@ -8585,6 +8585,42 @@ export const INITIAL_KPI_LIST: KpiRecord[] = [
 export const INITIAL_MUTASI_LIST: MutasiRecord[] = [
   {
     id: "mut-001",
+    tanggalEfektif: "2026-10-01",
+    nip: "BK-PP1-023",
+    nama: "Adi Tri Vianto",
+    jenisMutasi: "Status Kepegawaian",
+    nilaiLama: "PKWT",
+    nilaiBaru: "TETAP",
+    keterangan: "Pengangkatan Karyawan tetap per tanggal 1 Oktober 2026",
+    diinputOleh: "divisi1.bkr@gmail.com",
+    status: "Diterapkan"
+  },
+  {
+    id: "mut-002",
+    tanggalEfektif: "2026-10-01",
+    nip: "BK-PP1-022",
+    nama: "Windi Qiroatul Afrilia",
+    jenisMutasi: "Status Kepegawaian",
+    nilaiLama: "29/09/2026",
+    nilaiBaru: "2027-09-30",
+    keterangan: "Perpanjangan Masa Akhir PKWT",
+    diinputOleh: "divisi1.bkr@gmail.com",
+    status: "Diterapkan"
+  },
+  {
+    id: "mut-003",
+    tanggalEfektif: "2026-10-01",
+    nip: "BK-PP1-019",
+    nama: "May Yesi Triana Putri",
+    jenisMutasi: "Status Kepegawaian",
+    nilaiLama: "29/09/2026",
+    nilaiBaru: "2027-09-30",
+    keterangan: "Perpanjangan Masa Akhir PKWT",
+    diinputOleh: "divisi1.bkr@gmail.com",
+    status: "Diterapkan"
+  },
+  {
+    id: "mut-004",
     tanggalEfektif: "2026-08-01",
     nip: "BK-PP1-007",
     nama: "Yulia Wardana",
