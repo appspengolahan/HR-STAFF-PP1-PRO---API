@@ -1,5 +1,6 @@
 import { StaffData, PresensiRecord, LinkArsip, LemburRecord } from '../types';
 import { storageService } from './storageService';
+import { gasClient } from './gasClient';
 
 const SPREADSHEET_ID = '1KzEFolz_sE2bhUPTn2U2NWWPAgs3V9fpatYc7t1aGs0';
 
@@ -241,14 +242,14 @@ export const sheetSyncService = {
             }
           } catch (_) {}
 
-          const st = newStaff.find((s) => s.nama === nama);
+          const st = newStaff.find((s) => s.nama.toLowerCase() === nama.toLowerCase());
 
           newPresensi.push({
             id: `pr-${idx + 1}`,
             rowNum: idx + 6,
             tanggal: isoTgl,
             hari: hariName,
-            nip: st?.nip || 'BK-PP1-999',
+            nip: st?.nip || `BK-PP1-${String(idx + 1).padStart(3, '0')}`,
             nama,
             jamAwal,
             jamAkhir,
@@ -270,7 +271,19 @@ export const sheetSyncService = {
         storageService.savePresensiList(newPresensi);
       }
     } catch (e) {
-      console.warn('Gagal membaca LOG_PRESENSI_IJIN:', e);
+      console.warn('Gagal membaca LOG_PRESENSI_IJIN via CSV, mencoba fallback ke GAS REST API:', e);
+      try {
+        const gasCfg = storageService.getGasConfig();
+        if (gasCfg.apiUrl) {
+          const gasRes = await gasClient.fetchPresensi(gasCfg.apiUrl, newStaff.length > 0 ? newStaff : storageService.getStaffList());
+          if (gasRes.status === 'success' && gasRes.data && gasRes.data.length > 0) {
+            newPresensi = gasRes.data;
+            storageService.savePresensiList(newPresensi);
+          }
+        }
+      } catch (gasErr) {
+        console.error('Fallback GAS REST API juga gagal:', gasErr);
+      }
     }
 
     // 4. Fetch LOG_LEMBUR

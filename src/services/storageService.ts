@@ -76,8 +76,9 @@ export const storageService = {
   // Staff Master
   getStaffList(): StaffData[] {
     const list = readStorage<StaffData[]>(KEYS.STAFF, INITIAL_STAFF_LIST);
-    // Auto-migrate if previously stored list was the 24-staff mock
-    if (!list || list.length < 32) {
+    const hasSumiati = list && list.some((s) => s.nama.toUpperCase().includes('SUMIATI'));
+    // Auto-migrate if stored list is missing production workers like SUMIATI or has fewer than 87 staff
+    if (!list || list.length < 87 || !hasSumiati) {
       writeStorage(KEYS.STAFF, INITIAL_STAFF_LIST);
       return INITIAL_STAFF_LIST;
     }
@@ -142,9 +143,10 @@ export const storageService = {
   // Presensi
   getPresensiList(): PresensiRecord[] {
     const list = readStorage<PresensiRecord[]>(KEYS.PRESENSI, INITIAL_PRESENSI_LIST);
-    const agustinOct = list && list.find((p) => p.nip === 'BK-PP1-003' && p.bulan === 10 && p.tahun === 2026);
-    const isUpToDate = agustinOct && agustinOct.faktorPotongan === 0.5;
-    if (!list || list.length < 340 || !isUpToDate) {
+    const hasOct7 = list && list.some(
+      (p) => (p.tanggal === '2026-10-07' || p.tanggal === '07/10/2026') && p.nama.toUpperCase().includes('SUMIATI')
+    );
+    if (!list || list.length < 340 || !hasOct7) {
       writeStorage(KEYS.PRESENSI, INITIAL_PRESENSI_LIST);
       return INITIAL_PRESENSI_LIST;
     }

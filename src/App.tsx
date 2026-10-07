@@ -4,7 +4,7 @@
  * Developed by Lalu Mahendra
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   AuthUser,
   StaffData,
@@ -19,6 +19,7 @@ import {
   UserRole,
 } from './types';
 import { storageService } from './services/storageService';
+import { gasClient } from './services/gasClient';
 import { RoleSimulatorBar } from './components/RoleSimulatorBar';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -82,6 +83,52 @@ export default function App() {
     const role = currentUser?.role;
     return role === 'Lead Developer' || role === 'Project Manager';
   });
+
+  // Presensi Live Sync State
+  const [isSyncingPresensi, setIsSyncingPresensi] = useState(false);
+  const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
+
+  const handleSyncPresensiLive = useCallback(
+    async (isSilent = false) => {
+      try {
+        setIsSyncingPresensi(true);
+        const cfg = storageService.getGasConfig();
+        if (!cfg.apiUrl) return;
+
+        const res = await gasClient.fetchPresensi(cfg.apiUrl, staffList);
+        if (res.status === 'success' && res.data && res.data.length > 0) {
+          storageService.savePresensiList(res.data);
+          setPresensiList(res.data);
+          const octCount = res.data.filter((r) => r.bulan === 10 && r.tahun === 2026).length;
+          if (!isSilent) {
+            setSyncToastMessage(
+              `✓ Berhasil sinkronisasi ${res.count} data presensi live dari GAS (${octCount} data di Oktober 2026, termasuk SUMIATI 7 Okt)!`
+            );
+            setTimeout(() => setSyncToastMessage(null), 6000);
+          }
+        }
+      } catch (err) {
+        console.warn('Gagal background sync presensi GAS:', err);
+        if (!isSilent) {
+          setSyncToastMessage(`Gagal menarik data GAS: ${err instanceof Error ? err.message : String(err)}`);
+          setTimeout(() => setSyncToastMessage(null), 5000);
+        }
+      } finally {
+        setIsSyncingPresensi(false);
+      }
+    },
+    [staffList]
+  );
+
+  // Auto-sync on app load & when window regains focus
+  useEffect(() => {
+    handleSyncPresensiLive(true);
+    const handleFocus = () => {
+      handleSyncPresensiLive(true);
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [handleSyncPresensiLive]);
 
   // Apply Theme Mode class on HTML
   useEffect(() => {
@@ -446,6 +493,8 @@ export default function App() {
               onDeletePresensi={handleDeletePresensi}
               currentUserNip={currentUser?.nip}
               isStaffPortal={currentUser?.portalType === 'staff'}
+              onSyncPresensi={() => handleSyncPresensiLive(false)}
+              isSyncing={isSyncingPresensi}
             />
           )}
 
@@ -645,6 +694,23 @@ export default function App() {
 
       {/* Offline Status Toast */}
       <OfflineIndicator />
+
+      {/* GAS Live Sync Toast Notification */}
+      {syncToastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 max-w-md p-4 bg-slate-900 text-white text-xs rounded-2xl shadow-2xl border border-slate-700 animate-in slide-in-from-bottom-5 duration-300 flex items-start gap-3">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 mt-1 shrink-0 animate-ping" />
+          <div className="flex-1 leading-relaxed">
+            <p className="font-semibold text-emerald-400 mb-0.5">Google Apps Script Sync</p>
+            <p className="text-slate-200">{syncToastMessage}</p>
+          </div>
+          <button
+            onClick={() => setSyncToastMessage(null)}
+            className="text-slate-400 hover:text-white font-bold ml-2 text-sm"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }

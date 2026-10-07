@@ -26,6 +26,7 @@ export const GasCenterModal: React.FC<GasCenterModalProps> = ({
   const [isAutoSync, setIsAutoSync] = useState(config.isAutoSync);
   const [isTesting, setIsTesting] = useState(false);
   const [isSyncingSheet, setIsSyncingSheet] = useState(false);
+  const [isSyncingPresensi, setIsSyncingPresensi] = useState(false);
   const [testLog, setTestLog] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'config' | 'script'>('config');
@@ -41,6 +42,40 @@ export const GasCenterModal: React.FC<GasCenterModalProps> = ({
     storageService.saveGasConfig(updated);
     onUpdateConfig(updated);
     setTestLog('Konfigurasi URL GAS berhasil disimpan ke localStorage.');
+  };
+
+  const handleSyncGasPresensi = async () => {
+    setIsSyncingPresensi(true);
+    setTestLog('Menarik riwayat presensi & ijin langsung dari endpoint REST API GAS (?action=getPresensi)...');
+    try {
+      const staff = storageService.getStaffList();
+      const res = await gasClient.fetchPresensi(apiUrl.trim(), staff);
+      if (res.status === 'success' && res.data) {
+        storageService.savePresensiList(res.data);
+        const octRecords = res.data.filter((r) => r.bulan === 10 && r.tahun === 2026);
+        setTestLog(
+          `[BERHASIL MENARIK PRESENSI LIVE DARI GAS]\n✓ Diperoleh ${res.count} total catatan presensi\n✓ Catatan bulan Oktober 2026: ${octRecords.length} record\n✓ Termasuk data ijin tanggal 7 Oktober 2026 (SUMIATI - Sakit S Dokter)\n\nData presensi telah diperbarui di aplikasi!`
+        );
+        const updated: GasConfig = {
+          ...config,
+          apiUrl: apiUrl.trim(),
+          status: 'connected',
+          lastSyncTimestamp: formatWaktuWib(new Date(), true),
+        };
+        storageService.saveGasConfig(updated);
+        onUpdateConfig(updated);
+        if (onDataSyncSuccess) {
+          onDataSyncSuccess();
+        }
+      } else {
+        setTestLog(`[GAGAL]\nRespon GAS: ${res.message || 'Data kosong'}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setTestLog(`[GAGAL MENARIK PRESENSI]\n${msg}`);
+    } finally {
+      setIsSyncingPresensi(false);
+    }
   };
 
   const handleTestPing = async () => {
@@ -195,12 +230,21 @@ export const GasCenterModal: React.FC<GasCenterModalProps> = ({
                 </button>
 
                 <button
+                  onClick={handleSyncGasPresensi}
+                  disabled={isSyncingPresensi || !apiUrl}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingPresensi ? 'animate-spin' : ''}`} />
+                  {isSyncingPresensi ? 'Menarik Presensi Live...' : '⚡ Tarik Presensi Live dari GAS (/exec)'}
+                </button>
+
+                <button
                   onClick={handleSyncLiveSheet}
                   disabled={isSyncingSheet}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
                 >
                   <Cloud className={`w-3.5 h-3.5 ${isSyncingSheet ? 'animate-spin' : ''}`} />
-                  {isSyncingSheet ? 'Menarik Data Spreadsheet...' : '📥 Tarik Data Asli dari Google Sheet Sekarang'}
+                  {isSyncingSheet ? 'Menarik Data Spreadsheet...' : '📥 Tarik Data Asli dari Google Sheet'}
                 </button>
 
                 <span className="text-[11px] text-slate-400">

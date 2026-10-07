@@ -14,6 +14,7 @@ import {
   Edit3,
   X,
   Check,
+  RefreshCw,
 } from 'lucide-react';
 import { PresensiRecord, StaffData, JenisIjin } from '../../types';
 import { NAMA_BULAN_INDO } from '../../services/payrollEngine';
@@ -29,6 +30,8 @@ interface PresensiTabProps {
   onDeletePresensi: (id: string) => void;
   currentUserNip?: string;
   isStaffPortal?: boolean;
+  onSyncPresensi?: () => Promise<void>;
+  isSyncing?: boolean;
 }
 
 const JENIS_IJIN_OPTIONS: JenisIjin[] = [
@@ -51,6 +54,8 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   onDeletePresensi,
   currentUserNip,
   isStaffPortal = false,
+  onSyncPresensi,
+  isSyncing = false,
 }) => {
   const now = new Date();
   const [filterBulan, setFilterBulan] = useState<number>(now.getMonth() + 1);
@@ -374,6 +379,17 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {onSyncPresensi && (
+              <button
+                onClick={() => onSyncPresensi()}
+                disabled={isSyncing}
+                title="Tarik data presensi live langsung dari Google Apps Script"
+                className="px-3.5 py-2 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-800 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                {isSyncing ? 'Menarik GAS...' : 'Tarik Data GAS'}
+              </button>
+            )}
             <button
               onClick={() => setIsFormOpen(true)}
               className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
@@ -390,6 +406,21 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Live Active Indicator for October 2026 */}
+        {filterBulan === 10 && filterTahun === 2026 && (
+          <div className="px-5 py-2.5 bg-emerald-50 dark:bg-emerald-950/30 border-b border-emerald-200 dark:border-emerald-900/40 flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300 no-print">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+              <span>
+                <strong>Sinkronisasi Live Aktif (Oktober 2026):</strong> Menampilkan rekaman ijin/sakit live dari Google Apps Script (termasuk <strong>SUMIATI</strong> tgl 07/10/2026 - Sakit S Dokter).
+              </span>
+            </div>
+            <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/60 px-2.5 py-0.5 rounded-full shrink-0">
+              {filteredList.length} Catatan
+            </span>
+          </div>
+        )}
 
         {/* Print Header */}
         <div className="hidden print:block p-4 border-b border-black">

@@ -109,7 +109,7 @@ function doGet(e) {
         return jsonResponse_({ status: "success", count: staffList.length, data: staffList });
       }
 
-      // If get_all, continue collecting presensi & links
+      // 3. GET PRESENSI
       let presensiList = [];
       const shPresensi = ss.getSheetByName(SHEET_NAMES.PRESENSI);
       if (shPresensi) {
@@ -120,23 +120,31 @@ function doGet(e) {
             presensiList.push({
               rowNum: r + 1,
               tanggal: row[2] instanceof Date ? Utilities.formatDate(row[2], Session.getScriptTimeZone(), "yyyy-MM-dd") : String(row[2]),
+              tanggalIso: row[2] instanceof Date ? Utilities.formatDate(row[2], Session.getScriptTimeZone(), "yyyy-MM-dd") : String(row[2]),
               nama: String(row[3]).trim(),
+              unit: String(row[4] || "Produksi").trim(),
+              sekup: String(row[5] || "Proses").trim(),
               jamAwal: String(row[6] || "").trim(),
               jamAkhir: String(row[7] || "").trim(),
               durasiMenit: Number(row[8]) || 0,
               jenisIjin: String(row[9] || "Hadir").trim(),
               keperluan: String(row[10] || "").trim(),
+              lampiran: String(row[11] || "Tidak").trim(),
               lampiranSurat: String(row[11] || "Tidak").trim(),
               catatan: String(row[12] || "").trim(),
-              bulan: Number(row[14]) || 1,
-              tahun: Number(row[15]) || 2026,
+              bulan: Number(row[14]) || (row[2] instanceof Date ? (row[2].getMonth() + 1) : 10),
+              tahun: Number(row[15]) || (row[2] instanceof Date ? row[2].getFullYear() : 2026),
               faktorPotongan: Number(row[16]) || 0
             });
           }
         }
       }
 
-      let linksList = [];
+      if (action === "getPresensi" || action === "get_presensi") {
+        return jsonResponse_({ status: "success", count: presensiList.length, data: presensiList });
+      }
+
+      // If get_all, continue collecting links
       const shLinks = ss.getSheetByName(SHEET_NAMES.LINKS);
       if (shLinks) {
         const lValues = shLinks.getDataRange().getValues();
