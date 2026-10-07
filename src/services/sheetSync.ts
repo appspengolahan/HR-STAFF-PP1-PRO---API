@@ -200,16 +200,22 @@ export const sheetSyncService = {
     let newPresensi: PresensiRecord[] = [];
     try {
       const presensiRows = await this.fetchLiveSheetCsv('LOG_PRESENSI_IJIN');
-      presensiRows.slice(1).forEach((r, idx) => {
+      const allStaff = newStaff.length > 0 ? newStaff : storageService.getStaffList();
+      
+      presensiRows.forEach((r, idx) => {
+        // Skip header row if present
+        if (r[2] === 'Tanggal' || r[3] === 'Nama Staf' || r[3] === 'Nama') return;
+
         if (r.length > 3 && r[2] && r[3]) {
+          const rowId = r[1] && !isNaN(Number(r[1].replace(/[^\d]/g, ''))) ? Number(r[1].replace(/[^\d]/g, '')) : idx + 1;
           const rawTgl = r[2].replace(/^"|"$/g, '').trim();
           const nama = r[3].replace(/^"|"$/g, '').trim();
-          const jamAwal = (r[6] || '').replace(/^"|"$/g, '').trim();
-          const jamAkhir = (r[7] || '').replace(/^"|"$/g, '').trim();
+          const jamAwal = (r[6] || '08:00').replace(/^"|"$/g, '').trim();
+          const jamAkhir = (r[7] || '15:00').replace(/^"|"$/g, '').trim();
           const durasi = parseInt((r[8] || '0').replace(/[^\d]/g, ''), 10) || 0;
           const jenisIjin = (r[9] || 'Hadir').replace(/^"|"$/g, '').trim() as any;
           const keperluan = (r[10] || '').replace(/^"|"$/g, '').trim();
-          const lampiranSurat = ((r[11] || 'Tidak').replace(/^"|"$/g, '').trim() || 'Tidak') as any;
+          const lampiranSurat = ((r[11] || '').toLowerCase().includes('ya') ? 'Ya' : 'Tidak') as any;
           const catatan = (r[12] || '').replace(/^"|"$/g, '').trim();
 
           let isoTgl = rawTgl;
@@ -225,7 +231,10 @@ export const sheetSyncService = {
           }
 
           let faktor = 0;
-          if (['Sakit (S Tangan)', 'Ijin (S Tangan)', 'Alpha'].includes(jenisIjin)) {
+          const rawFaktor = (r[16] || '').replace(',', '.').replace(/^"|"$/g, '').trim();
+          if (rawFaktor !== '' && !isNaN(parseFloat(rawFaktor))) {
+            faktor = parseFloat(rawFaktor);
+          } else if (['Sakit (S Tangan)', 'Ijin (S Tangan)', 'Alpha'].includes(jenisIjin)) {
             faktor = 1;
           } else if (['Ijin Terlambat', 'Ijin Keluar Sementara', 'Ijin Pulang Awal'].includes(jenisIjin)) {
             if (durasi <= 120) faktor = 0;
@@ -242,14 +251,14 @@ export const sheetSyncService = {
             }
           } catch (_) {}
 
-          const st = newStaff.find((s) => s.nama.toLowerCase() === nama.toLowerCase());
+          const st = allStaff.find((s) => s.nama.toLowerCase() === nama.toLowerCase());
 
           newPresensi.push({
-            id: `pr-${idx + 1}`,
-            rowNum: idx + 6,
+            id: `pr-${rowId}`,
+            rowNum: rowId,
             tanggal: isoTgl,
             hari: hariName,
-            nip: st?.nip || `BK-PP1-${String(idx + 1).padStart(3, '0')}`,
+            nip: st?.nip || `BK-PP1-${String(rowId).padStart(3, '0')}`,
             nama,
             jamAwal,
             jamAkhir,

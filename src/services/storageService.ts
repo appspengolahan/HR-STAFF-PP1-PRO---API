@@ -77,8 +77,8 @@ export const storageService = {
   getStaffList(): StaffData[] {
     const list = readStorage<StaffData[]>(KEYS.STAFF, INITIAL_STAFF_LIST);
     const hasSumiati = list && list.some((s) => s.nama.toUpperCase().includes('SUMIATI'));
-    // Auto-migrate if stored list is missing production workers like SUMIATI or has fewer than 87 staff
-    if (!list || list.length < 87 || !hasSumiati) {
+    // Enforce 32 staff Divisi Produksi 1 (purge any incorrect worker mock/mismatched data)
+    if (!list || list.length !== 32 || hasSumiati) {
       writeStorage(KEYS.STAFF, INITIAL_STAFF_LIST);
       return INITIAL_STAFF_LIST;
     }
@@ -143,10 +143,11 @@ export const storageService = {
   // Presensi
   getPresensiList(): PresensiRecord[] {
     const list = readStorage<PresensiRecord[]>(KEYS.PRESENSI, INITIAL_PRESENSI_LIST);
-    const hasOct7 = list && list.some(
-      (p) => (p.tanggal === '2026-10-07' || p.tanggal === '07/10/2026') && p.nama.toUpperCase().includes('SUMIATI')
+    const hasMatsukriOct7 = list && list.some(
+      (p) => (p.tanggal === '2026-10-07' || p.tanggal === '07/10/2026') && p.nama.toLowerCase().includes('matsukri')
     );
-    if (!list || list.length < 340 || !hasOct7) {
+    const hasSumiati = list && list.some((p) => p.nama.toUpperCase().includes('SUMIATI'));
+    if (!list || list.length < 358 || !hasMatsukriOct7 || hasSumiati) {
       writeStorage(KEYS.PRESENSI, INITIAL_PRESENSI_LIST);
       return INITIAL_PRESENSI_LIST;
     }

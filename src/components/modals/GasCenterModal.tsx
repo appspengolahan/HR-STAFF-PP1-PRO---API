@@ -54,7 +54,7 @@ export const GasCenterModal: React.FC<GasCenterModalProps> = ({
         storageService.savePresensiList(res.data);
         const octRecords = res.data.filter((r) => r.bulan === 10 && r.tahun === 2026);
         setTestLog(
-          `[BERHASIL MENARIK PRESENSI LIVE DARI GAS]\n✓ Diperoleh ${res.count} total catatan presensi\n✓ Catatan bulan Oktober 2026: ${octRecords.length} record\n✓ Termasuk data ijin tanggal 7 Oktober 2026 (SUMIATI - Sakit S Dokter)\n\nData presensi telah diperbarui di aplikasi!`
+          `[BERHASIL MENARIK PRESENSI LIVE DARI GAS]\n✓ Diperoleh ${res.count} total catatan presensi\n✓ Catatan bulan Oktober 2026: ${octRecords.length} record\n✓ Termasuk data ijin tanggal 7 Oktober 2026 (Matsukri - Ijin Terlambat)\n\nData presensi telah diperbarui di aplikasi!`
         );
         const updated: GasConfig = {
           ...config,

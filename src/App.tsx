@@ -102,7 +102,7 @@ export default function App() {
           const octCount = res.data.filter((r) => r.bulan === 10 && r.tahun === 2026).length;
           if (!isSilent) {
             setSyncToastMessage(
-              `✓ Berhasil sinkronisasi ${res.count} data presensi live dari GAS (${octCount} data di Oktober 2026, termasuk SUMIATI 7 Okt)!`
+              `✓ Berhasil sinkronisasi ${res.count} data presensi live dari GAS (${octCount} data di Oktober 2026, termasuk Matsukri 7 Okt)!`
             );
             setTimeout(() => setSyncToastMessage(null), 6000);
           }

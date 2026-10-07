@@ -413,7 +413,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
               <span>
-                <strong>Sinkronisasi Live Aktif (Oktober 2026):</strong> Menampilkan rekaman ijin/sakit live dari Google Apps Script (termasuk <strong>SUMIATI</strong> tgl 07/10/2026 - Sakit S Dokter).
+                <strong>Data Live Aktif (Oktober 2026):</strong> Menampilkan rekaman ijin/ketidakhadiran staf Divisi Produksi I (termasuk <strong>Matsukri</strong> tgl 07/10/2026 - Ijin Terlambat).
               </span>
             </div>
             <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/60 px-2.5 py-0.5 rounded-full shrink-0">
