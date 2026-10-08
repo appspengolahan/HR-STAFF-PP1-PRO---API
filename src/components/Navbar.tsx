@@ -36,6 +36,7 @@ interface NavbarProps {
   isDevSupervisorVisible?: boolean;
   isAutoRefreshActive?: boolean;
   onToggleAutoRefresh?: () => void;
+  onOpenColumnSettings?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -53,6 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isDevSupervisorVisible = false,
   isAutoRefreshActive = true,
   onToggleAutoRefresh,
+  onOpenColumnSettings,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
@@ -324,6 +326,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                     REST V2
                   </span>
                 </button>
+
+                {onOpenColumnSettings && (
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onOpenColumnSettings();
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors text-left cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                        <Sliders className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-xs">Pengaturan Tampilan Kolom</div>
+                        <div className="text-[10px] text-slate-400">Atur Kolom Gaji &amp; Tunjangan</div>
+                      </div>
+                    </div>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                      Kolom
+                    </span>
+                  </button>
+                )}
 
                 {!isInstalled && isInstallable && (
                   <button

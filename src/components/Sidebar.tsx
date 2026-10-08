@@ -12,6 +12,7 @@ import {
   GraduationCap,
   UserCircle,
   ShieldCheck,
+  SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
   Layers,
@@ -50,6 +51,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'pelatihan', label: 'Calon Karyawan', icon: GraduationCap, badge: 'Seleksi', badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
   { id: 'profil', label: 'Profil Karyawan', icon: UserCircle },
   { id: 'hakakses', label: 'Hak Akses & Akun', icon: ShieldCheck, badge: 'RBAC', badgeColor: 'bg-red-500/20 text-red-400 border-red-500/30' },
+  { id: 'pengaturan', label: 'Pengaturan', icon: SlidersHorizontal, badge: 'Kolom', badgeColor: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -68,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (currentUser.portalType === 'staff') {
       return item.id === 'slip' || item.id === 'profil' || item.id === 'presensi' || item.id === 'cuti';
     }
-    return allowed.includes(item.id);
+    return allowed.includes(item.id) || item.id === 'pengaturan';
   });
 
   return (

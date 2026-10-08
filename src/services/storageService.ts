@@ -23,6 +23,11 @@ import {
   INITIAL_STAFF_LIST,
 } from '../data/initialData';
 
+export interface ColumnVisibilitySettings {
+  showGajiPokok: boolean;
+  showTunjanganJabatan: boolean;
+}
+
 const KEYS = {
   STAFF: 'bk_hr_staff_list_v3',
   PRESENSI: 'bk_hr_presensi_list_v3',
@@ -37,6 +42,7 @@ const KEYS = {
   GAS_CONFIG: 'bk_hr_gas_config_v3',
   THEME_MODE: 'bk_hr_theme_mode_v3',
   SIDEBAR_COLLAPSED: 'bk_hr_sidebar_collapsed_v3',
+  COLUMN_SETTINGS: 'bk_hr_column_settings_v3',
 };
 
 // Cleanup old obsolete v1 and v2 keys
@@ -336,10 +342,15 @@ export const storageService = {
         'pelatihan',
         'profil',
         'hakakses',
+        'pengaturan',
       ],
       department: 'Administrasi & Teknologi Industri',
     };
-    return readStorage<AuthUser | null>(KEYS.AUTH_USER, fallback);
+    const user = readStorage<AuthUser | null>(KEYS.AUTH_USER, fallback);
+    if (user && user.portalType === 'management' && !user.allowedTabs.includes('pengaturan')) {
+      user.allowedTabs.push('pengaturan');
+    }
+    return user;
   },
   saveAuthUser(user: AuthUser | null): void {
     writeStorage(KEYS.AUTH_USER, user);
@@ -384,6 +395,18 @@ export const storageService = {
   },
   saveSidebarCollapsed(collapsed: boolean): void {
     writeStorage(KEYS.SIDEBAR_COLLAPSED, collapsed);
+  },
+
+  // Column Display Settings (Checklist Kolom Tampilan)
+  getColumnSettings(): ColumnVisibilitySettings {
+    const fallback: ColumnVisibilitySettings = {
+      showGajiPokok: true,
+      showTunjanganJabatan: true,
+    };
+    return readStorage<ColumnVisibilitySettings>(KEYS.COLUMN_SETTINGS, fallback);
+  },
+  saveColumnSettings(settings: ColumnVisibilitySettings): void {
+    writeStorage(KEYS.COLUMN_SETTINGS, settings);
   },
 
   // Reset to initial demo data

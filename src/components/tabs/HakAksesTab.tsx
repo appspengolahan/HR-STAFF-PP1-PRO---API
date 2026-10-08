@@ -32,31 +32,31 @@ const ROLE_PERMISSIONS: RolePermission[] = [
   {
     role: 'Lead Developer',
     desc: 'Super User: Konfigurasi sistem, debugging REST GAS, & override data',
-    defaultTabs: ['dashboard', 'presensi', 'lembur', 'rekap', 'slip', 'cuti', 'kpi', 'database', 'mutasi', 'pelatihan', 'profil', 'hakakses'],
+    defaultTabs: ['dashboard', 'presensi', 'lembur', 'rekap', 'slip', 'cuti', 'kpi', 'database', 'mutasi', 'pelatihan', 'profil', 'hakakses', 'pengaturan'],
     userCount: 1,
   },
   {
     role: 'Project Manager',
     desc: 'Lalu Mahendra Ali Akbar: Kontrol operasional PP1 penuh & approval',
-    defaultTabs: ['dashboard', 'presensi', 'lembur', 'rekap', 'slip', 'cuti', 'kpi', 'database', 'mutasi', 'pelatihan', 'profil', 'hakakses'],
+    defaultTabs: ['dashboard', 'presensi', 'lembur', 'rekap', 'slip', 'cuti', 'kpi', 'database', 'mutasi', 'pelatihan', 'profil', 'hakakses', 'pengaturan'],
     userCount: 1,
   },
   {
     role: 'Site Engineer',
     desc: 'Andhik Dharmabakti: Monitoring OEE mesin, presensi shift, & lembur',
-    defaultTabs: ['dashboard', 'presensi', 'lembur', 'kpi', 'database', 'profil'],
+    defaultTabs: ['dashboard', 'presensi', 'lembur', 'kpi', 'database', 'profil', 'pengaturan'],
     userCount: 2,
   },
   {
     role: 'Admin HR',
     desc: 'Personalia: Presensi harian, berkas izin, PKWT & database staf',
-    defaultTabs: ['dashboard', 'presensi', 'lembur', 'rekap', 'cuti', 'database', 'mutasi', 'pelatihan', 'profil'],
+    defaultTabs: ['dashboard', 'presensi', 'lembur', 'rekap', 'cuti', 'database', 'mutasi', 'pelatihan', 'profil', 'pengaturan'],
     userCount: 2,
   },
   {
     role: 'Finance',
     desc: 'Keuangan & Pajak: Slip gaji, perhitungan PPh21 TER, & BPJS',
-    defaultTabs: ['dashboard', 'slip', 'rekap', 'database', 'profil'],
+    defaultTabs: ['dashboard', 'slip', 'rekap', 'database', 'profil', 'pengaturan'],
     userCount: 2,
   },
   {

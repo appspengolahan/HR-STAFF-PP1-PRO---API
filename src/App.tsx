@@ -45,6 +45,9 @@ import { JadwalMutasiTab } from './components/tabs/JadwalMutasiTab';
 import { PelatihanCalonTab } from './components/tabs/PelatihanCalonTab';
 import { ProfilStaffTab } from './components/tabs/ProfilStaffTab';
 import { HakAksesTab } from './components/tabs/HakAksesTab';
+import { PengaturanTab } from './components/tabs/PengaturanTab';
+import { ColumnSettingsModal } from './components/modals/ColumnSettingsModal';
+import { ColumnVisibilitySettings } from './services/storageService';
 
 export default function App() {
   // Master State
@@ -77,6 +80,17 @@ export default function App() {
   const [isGasCenterOpen, setIsGasCenterOpen] = useState(false);
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
+
+  // Column Visibility Settings (Gaji Pokok & Tunjangan Jabatan)
+  const [columnSettings, setColumnSettings] = useState<ColumnVisibilitySettings>(() =>
+    storageService.getColumnSettings()
+  );
+
+  const handleUpdateColumnSettings = (newSettings: ColumnVisibilitySettings) => {
+    setColumnSettings(newSettings);
+    storageService.saveColumnSettings(newSettings);
+  };
 
   // Secret Door & Developer Supervisor
   const [secretDoorTriggered, setSecretDoorTriggered] = useState(false);
@@ -497,6 +511,7 @@ export default function App() {
         isDevSupervisorVisible={isDevSupervisorVisible}
         isAutoRefreshActive={isAutoRefreshActive}
         onToggleAutoRefresh={handleToggleAutoRefresh}
+        onOpenColumnSettings={() => setIsColumnSettingsOpen(true)}
       />
 
       {/* Sidebar for Desktop / Tablet */}
@@ -603,6 +618,8 @@ export default function App() {
               onDeleteStaff={handleDeleteStaff}
               onAddMutasi={handleAddMutasi}
               onViewProfile={handleViewProfile}
+              columnSettings={columnSettings}
+              onUpdateColumnSettings={handleUpdateColumnSettings}
             />
           )}
 
@@ -642,6 +659,15 @@ export default function App() {
               currentUser={currentUser}
               deletedArchives={storageService.getDeletedArchives()}
               onResetData={() => storageService.resetAllData()}
+            />
+          )}
+
+          {activeTab === 'pengaturan' && (
+            <PengaturanTab
+              columnSettings={columnSettings}
+              onUpdateColumnSettings={handleUpdateColumnSettings}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+              staffList={staffList}
             />
           )}
         </main>
@@ -695,6 +721,7 @@ export default function App() {
                 { id: 'pelatihan', label: 'Calon Karyawan' },
                 { id: 'profil', label: 'Profil Saya' },
                 { id: 'hakakses', label: 'Hak Akses RBAC' },
+                { id: 'pengaturan', label: 'Pengaturan' },
               ].map((m) => (
                 <button
                   key={m.id}
@@ -719,6 +746,12 @@ export default function App() {
       {/* Global Modals */}
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       <SwitchBoardModal isOpen={isSwitchBoardOpen} onClose={() => setIsSwitchBoardOpen(false)} />
+      <ColumnSettingsModal
+        isOpen={isColumnSettingsOpen}
+        onClose={() => setIsColumnSettingsOpen(false)}
+        settings={columnSettings}
+        onUpdateSettings={handleUpdateColumnSettings}
+      />
       <GasCenterModal
         isOpen={isGasCenterOpen}
         onClose={() => setIsGasCenterOpen(false)}

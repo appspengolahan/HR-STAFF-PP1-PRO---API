@@ -12,11 +12,14 @@ import {
   CheckCircle2,
   FileText,
   UserCheck,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { StaffData, MutasiRecord } from '../../types';
 import { formatRupiah } from '../../services/payrollEngine';
 import { PkwtAlertCard, parsePkwtDate } from '../PkwtAlertCard';
 import { formatTanggalIndo } from '../../utils/dateFormatter';
+import { storageService, ColumnVisibilitySettings } from '../../services/storageService';
+import { ColumnSettingsModal } from '../modals/ColumnSettingsModal';
 
 interface DatabaseStaffTabProps {
   staffList: StaffData[];
@@ -25,6 +28,8 @@ interface DatabaseStaffTabProps {
   onDeleteStaff: (nip: string) => void;
   onAddMutasi: (mutasi: MutasiRecord) => void;
   onViewProfile: (nip: string) => void;
+  columnSettings?: ColumnVisibilitySettings;
+  onUpdateColumnSettings?: (settings: ColumnVisibilitySettings) => void;
 }
 
 export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
@@ -34,6 +39,8 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
   onDeleteStaff,
   onAddMutasi,
   onViewProfile,
+  columnSettings: externalColumnSettings,
+  onUpdateColumnSettings,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSekup, setFilterSekup] = useState<'Semua' | 'Operasional' | 'Administrasi'>('Semua');
@@ -43,8 +50,24 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
   // Modal State
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffData | null>(null);
   const [selectedStaffForMutasi, setSelectedStaffForMutasi] = useState<StaffData | null>(null);
+
+  // Column Visibility Settings
+  const [internalColumnSettings, setInternalColumnSettings] = useState<ColumnVisibilitySettings>(() => {
+    return storageService.getColumnSettings();
+  });
+
+  const columnSettings = externalColumnSettings || internalColumnSettings;
+
+  const handleUpdateColumnSettings = (newSettings: ColumnVisibilitySettings) => {
+    setInternalColumnSettings(newSettings);
+    storageService.saveColumnSettings(newSettings);
+    if (onUpdateColumnSettings) {
+      onUpdateColumnSettings(newSettings);
+    }
+  };
 
   // Edit Staff Form State
   const [editNama, setEditNama] = useState('');
@@ -319,6 +342,14 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
               Tambah Staf Baru
             </button>
             <button
+              onClick={() => setIsColumnSettingsOpen(true)}
+              className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+              title="Atur checklist kolom tampilan (Gaji Pokok & Tunjangan Jabatan)"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              Atur Kolom
+            </button>
+            <button
               onClick={handleExportPdf}
               className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-colors"
             >
@@ -349,7 +380,12 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                 <th className="py-3 px-3">Pendidikan</th>
                 <th className="py-3 px-3">Unit</th>
                 <th className="py-3 px-3">Status</th>
-                <th className="py-3 px-3 text-right">Gaji Pokok</th>
+                {columnSettings.showGajiPokok && (
+                  <th className="py-3 px-3 text-right">Gaji Pokok</th>
+                )}
+                {columnSettings.showTunjanganJabatan && (
+                  <th className="py-3 px-3 text-right">Tunjangan Jabatan</th>
+                )}
                 <th className="py-3 px-3">PTKP</th>
                 <th className="py-3 px-3">Akhir PKWT</th>
                 <th className="py-3 px-3 text-right no-print">Aksi</th>
@@ -388,9 +424,16 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                         {st.status}
                       </span>
                     </td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-700 dark:text-slate-300">
-                      {formatRupiah(st.gajiPokok)}
-                    </td>
+                    {columnSettings.showGajiPokok && (
+                      <td className="py-3 px-3 text-right font-mono font-bold text-slate-700 dark:text-slate-300">
+                        {formatRupiah(st.gajiPokok)}
+                      </td>
+                    )}
+                    {columnSettings.showTunjanganJabatan && (
+                      <td className="py-3 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        {formatRupiah(st.tunjanganJabatan || 0)}
+                      </td>
+                    )}
                     <td className="py-3 px-3 font-mono text-[11px]">{st.statusPTKP}</td>
                     <td className="py-3 px-3 font-mono text-[11px]">
                       <div>{st.akhirPKWT || '-'}</div>
@@ -980,6 +1023,14 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Pengaturan Tampilan Kolom (Gaji Pokok & Tunjangan Jabatan) */}
+      <ColumnSettingsModal
+        isOpen={isColumnSettingsOpen}
+        onClose={() => setIsColumnSettingsOpen(false)}
+        settings={columnSettings}
+        onUpdateSettings={handleUpdateColumnSettings}
+      />
     </div>
   );
 };
