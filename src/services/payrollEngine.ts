@@ -205,6 +205,63 @@ export function getTarifTer(kategori: 'A' | 'B' | 'C', brutoBulanan: number): nu
 }
 
 /**
+ * Hitung faktor potongan kehadiran secara presisi & fail-safe
+ * Sesuai aturan 26 hari kerja baku & exception-only HR Divisi Produksi I
+ */
+export function getEffectiveFaktorPotongan(p: {
+  jenisIjin?: string;
+  faktorPotongan?: number;
+  durasiMenit?: number;
+  lampiranSurat?: string;
+  catatan?: string;
+}): number {
+  const jenis = (p.jenisIjin || '').trim();
+  const durasi = Number(p.durasiMenit) || 0;
+  const lampiran = (p.lampiranSurat || '').trim().toLowerCase();
+  const catatan = (p.catatan || '').trim().toLowerCase();
+
+  // Sakit dengan Surat Dokter Resmi (ada surat dokter / lampiran Ya) tidak dipotong
+  if (
+    jenis === 'Sakit (S Dokter)' ||
+    lampiran === 'ya' ||
+    catatan.includes('surat dokter') ||
+    jenis === 'Cuti' ||
+    jenis === 'Cuti Tahunan' ||
+    jenis === 'Ijin Normatif'
+  ) {
+    return 0;
+  }
+
+  // Jika faktor potongan sudah terisi angka valid > 0
+  if (typeof p.faktorPotongan === 'number' && !isNaN(p.faktorPotongan) && p.faktorPotongan > 0) {
+    return p.faktorPotongan;
+  }
+
+  // Evaluasi jenis izin tidak dibayar penuh (1 hari kerja)
+  if (
+    jenis === 'Ijin (S Tangan)' ||
+    jenis === 'Sakit (S Tangan)' ||
+    jenis === 'Alpha' ||
+    jenis === 'Ijin Tidak Masuk'
+  ) {
+    return 1.0;
+  }
+
+  // Izin parsial harian (terlambat, pulang cepat, keluar sementara)
+  if (
+    jenis === 'Ijin Terlambat' ||
+    jenis === 'Ijin Keluar Sementara' ||
+    jenis === 'Ijin Pulang Awal'
+  ) {
+    if (durasi <= 120) return 0;
+    if (durasi < 240) return 0.5;
+    return 1.0;
+  }
+
+  return Number(p.faktorPotongan) || 0;
+}
+
+/**
  * Konversi angka ke terbilang Rupiah resmi
  */
 export function terbilang(nominal: number): string {

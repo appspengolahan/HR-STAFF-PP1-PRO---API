@@ -1,6 +1,7 @@
 import { StaffData, PresensiRecord, LinkArsip, LemburRecord } from '../types';
 import { storageService } from './storageService';
 import { gasClient } from './gasClient';
+import { getEffectiveFaktorPotongan } from './payrollEngine';
 
 const SPREADSHEET_ID = '1KzEFolz_sE2bhUPTn2U2NWWPAgs3V9fpatYc7t1aGs0';
 
@@ -219,7 +220,7 @@ export const sheetSyncService = {
           const catatan = (r[12] || '').replace(/^"|"$/g, '').trim();
 
           let isoTgl = rawTgl;
-          let bulan = 1;
+          let bulan = 10;
           let tahun = 2026;
           if (rawTgl.includes('/')) {
             const p = rawTgl.split('/');
@@ -228,19 +229,24 @@ export const sheetSyncService = {
               bulan = parseInt(p[1], 10);
               tahun = parseInt(p[2], 10);
             }
+          } else if (rawTgl.includes('-')) {
+            const p = rawTgl.split('-');
+            if (p.length === 3) {
+              isoTgl = rawTgl;
+              tahun = parseInt(p[0], 10);
+              bulan = parseInt(p[1], 10);
+            }
           }
 
-          let faktor = 0;
           const rawFaktor = (r[16] || '').replace(',', '.').replace(/^"|"$/g, '').trim();
-          if (rawFaktor !== '' && !isNaN(parseFloat(rawFaktor))) {
-            faktor = parseFloat(rawFaktor);
-          } else if (['Sakit (S Tangan)', 'Ijin (S Tangan)', 'Alpha'].includes(jenisIjin)) {
-            faktor = 1;
-          } else if (['Ijin Terlambat', 'Ijin Keluar Sementara', 'Ijin Pulang Awal'].includes(jenisIjin)) {
-            if (durasi <= 120) faktor = 0;
-            else if (durasi < 240) faktor = 0.5;
-            else faktor = 1;
-          }
+          const parsedFaktor = rawFaktor !== '' && !isNaN(parseFloat(rawFaktor)) ? parseFloat(rawFaktor) : undefined;
+          const faktor = getEffectiveFaktorPotongan({
+            jenisIjin,
+            durasiMenit: durasi,
+            lampiranSurat,
+            catatan,
+            faktorPotongan: parsedFaktor,
+          });
 
           const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
           let hariName = 'Hari';

@@ -22,6 +22,7 @@ import {
   INITIAL_PRESENSI_LIST,
   INITIAL_STAFF_LIST,
 } from '../data/initialData';
+import { getEffectiveFaktorPotongan } from './payrollEngine';
 
 export interface ColumnVisibilitySettings {
   showGajiPokok: boolean;
@@ -153,11 +154,18 @@ export const storageService = {
       (p) => (p.tanggal === '2026-10-07' || p.tanggal === '07/10/2026') && p.nama.toLowerCase().includes('matsukri')
     );
     const hasSumiati = list && list.some((p) => p.nama.toUpperCase().includes('SUMIATI'));
-    if (!list || list.length < 358 || !hasMatsukriOct7 || hasSumiati) {
-      writeStorage(KEYS.PRESENSI, INITIAL_PRESENSI_LIST);
-      return INITIAL_PRESENSI_LIST;
-    }
-    return list;
+    const sourceList = (!list || list.length < 358 || !hasMatsukriOct7 || hasSumiati)
+      ? INITIAL_PRESENSI_LIST
+      : list;
+
+    // Normalisasi faktor potongan presisi (agar data presensi sinkron lama otomatis ter-update)
+    return sourceList.map((p) => {
+      const eff = getEffectiveFaktorPotongan(p);
+      if (eff > 0 && (p.faktorPotongan === 0 || p.faktorPotongan === undefined)) {
+        return { ...p, faktorPotongan: eff };
+      }
+      return p;
+    });
   },
   savePresensiList(list: PresensiRecord[]): void {
     writeStorage(KEYS.PRESENSI, list);

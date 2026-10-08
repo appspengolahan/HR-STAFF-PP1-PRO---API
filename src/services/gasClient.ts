@@ -1,4 +1,5 @@
 import { PresensiRecord, LemburRecord, StaffData, JenisIjin } from '../types';
+import { getEffectiveFaktorPotongan } from './payrollEngine';
 
 export interface GasResponse<T = unknown> {
   status: 'success' | 'error';
@@ -125,20 +126,17 @@ export const gasClient = {
 
       const durasiMenit = Number(r.durasiMenit) || 0;
       const jenisIjin = (r.jenisIjin || 'Hadir') as JenisIjin;
-
-      let faktorPotongan = Number(r.faktorPotongan);
-      if (isNaN(faktorPotongan)) {
-        if (['Sakit (S Tangan)', 'Ijin (S Tangan)', 'Alpha'].includes(jenisIjin)) {
-          faktorPotongan = 1;
-        } else if (['Ijin Terlambat', 'Ijin Keluar Sementara', 'Ijin Pulang Awal'].includes(jenisIjin)) {
-          faktorPotongan = durasiMenit <= 120 ? 0 : durasiMenit < 240 ? 0.5 : 1;
-        } else {
-          faktorPotongan = 0;
-        }
-      }
-
       const lampiranSurat =
         (r.lampiranSurat || r.lampiran || 'Tidak') === 'Ya' ? 'Ya' : 'Tidak';
+
+      const parsedFaktor = Number(r.faktorPotongan);
+      const faktorPotongan = getEffectiveFaktorPotongan({
+        jenisIjin,
+        durasiMenit,
+        lampiranSurat,
+        catatan: String(r.catatan || ''),
+        faktorPotongan: isNaN(parsedFaktor) ? undefined : parsedFaktor,
+      });
 
       return {
         id: `pr-gas-${rowNum}`,
