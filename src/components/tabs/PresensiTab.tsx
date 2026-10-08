@@ -183,9 +183,10 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
         const matchStaff = isStaffPortal
           ? item.nip === currentUserNip
           : filterNama ? item.nip === filterNama : true;
-        const matchSearch =
-          item.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (item.keperluan && item.keperluan.toLowerCase().includes(searchQuery.toLowerCase()));
+        const q = searchQuery.trim().toLowerCase();
+        const matchSearch = q
+          ? item.nama.toLowerCase().includes(q) || item.nip.toLowerCase().includes(q)
+          : true;
 
         return matchBulan && matchTahun && matchStaff && matchSearch;
       })
@@ -364,12 +365,12 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
             )}
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Cari Cepat</label>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Cari Nama</label>
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Cari keperluan..."
+                  placeholder="Cari nama staf..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-8 pr-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-white"
