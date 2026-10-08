@@ -267,14 +267,25 @@ export const storageService = {
 
   // Calon Karyawan
   getCalonList(): CalonKaryawan[] {
-    return readStorage<CalonKaryawan[]>(KEYS.CALON, INITIAL_CALON_LIST);
+    const list = readStorage<CalonKaryawan[]>(KEYS.CALON, INITIAL_CALON_LIST);
+    // Bersihkan data dummy Bayu Pratama jika sebelumnya tersimpan di storage lokal
+    const cleaned = list.filter((c) => c.nama !== 'Bayu Pratama' && c.id !== 'calon-001');
+    if (cleaned.length !== list.length) {
+      writeStorage(KEYS.CALON, cleaned);
+    }
+    return cleaned;
   },
   saveCalonList(list: CalonKaryawan[]): void {
-    writeStorage(KEYS.CALON, list);
+    const cleaned = list.filter((c) => c.nama !== 'Bayu Pratama' && c.id !== 'calon-001');
+    writeStorage(KEYS.CALON, cleaned);
   },
   addCalon(c: CalonKaryawan): void {
     const list = this.getCalonList();
     list.unshift(c);
+    this.saveCalonList(list);
+  },
+  deleteCalon(calonId: string): void {
+    const list = this.getCalonList().filter((c) => c.id !== calonId);
     this.saveCalonList(list);
   },
 

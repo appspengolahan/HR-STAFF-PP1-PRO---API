@@ -8,6 +8,7 @@ import {
   Clock,
   Printer,
   UserPlus,
+  Trash2,
 } from 'lucide-react';
 import { CalonKaryawan, StaffData } from '../../types';
 import { formatTanggalDmy } from '../../utils/dateFormatter';
@@ -18,6 +19,7 @@ interface PelatihanCalonTabProps {
   onGraduateCalon: (calonId: string, staffData: StaffData) => void;
   onExtendCalon: (calonId: string, newEndDate: string, reason: string) => void;
   onFailCalon: (calonId: string, reason: string) => void;
+  onDeleteCalon?: (calonId: string) => void;
 }
 
 export const PelatihanCalonTab: React.FC<PelatihanCalonTabProps> = ({
@@ -26,9 +28,11 @@ export const PelatihanCalonTab: React.FC<PelatihanCalonTabProps> = ({
   onGraduateCalon,
   onExtendCalon,
   onFailCalon,
+  onDeleteCalon,
 }) => {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [selectedCalon, setSelectedCalon] = useState<CalonKaryawan | null>(null);
+  const [calonToDelete, setCalonToDelete] = useState<CalonKaryawan | null>(null);
 
   // New Calon Form
   const [namaCalon, setNamaCalon] = useState('');
@@ -163,8 +167,28 @@ export const PelatihanCalonTab: React.FC<PelatihanCalonTabProps> = ({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {calonList.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400">
-                    Tidak ada calon karyawan yang sedang dalam masa pelatihan seleksi.
+                  <td colSpan={9} className="py-16 text-center">
+                    <div className="max-w-md mx-auto flex flex-col items-center justify-center text-center space-y-3">
+                      <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xs">
+                        <GraduationCap className="w-7 h-7" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                          Belum Ada Calon Karyawan Aktif
+                        </h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
+                          Daftar calon karyawan dalam kondisi kosong. Modul ini siap digunakan kapan saja jika terdapat rekrutmen atau masa pelatihan calon staf baru di Divisi Produksi I.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddOpen(true)}
+                        className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Tambah Calon Baru
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -197,15 +221,26 @@ export const PelatihanCalonTab: React.FC<PelatihanCalonTabProps> = ({
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right no-print">
-                      <button
-                        onClick={() => {
-                          setSelectedCalon(item);
-                          setGradJabatan(item.proyeksiJabatan);
-                        }}
-                        className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 rounded-lg text-xs font-semibold transition-colors"
-                      >
-                        Update Status
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => {
+                            setSelectedCalon(item);
+                            setGradJabatan(item.proyeksiJabatan);
+                          }}
+                          className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          Update Status
+                        </button>
+                        {onDeleteCalon && (
+                          <button
+                            onClick={() => setCalonToDelete(item)}
+                            title="Hapus Data Calon"
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -454,22 +489,85 @@ export const PelatihanCalonTab: React.FC<PelatihanCalonTabProps> = ({
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedCalon(null)}
-                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-semibold"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-sm"
-                >
-                  Konfirmasi Status
-                </button>
+              <div className="flex items-center justify-between gap-2 pt-2">
+                {onDeleteCalon && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = selectedCalon;
+                      setSelectedCalon(null);
+                      setCalonToDelete(target);
+                    }}
+                    className="px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Hapus Calon
+                  </button>
+                )}
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCalon(null)}
+                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-semibold cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-sm cursor-pointer"
+                  >
+                    Konfirmasi Status
+                  </button>
+                </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus Calon */}
+      {calonToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
+              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/60 flex items-center justify-center">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                  Hapus Data Calon Karyawan
+                </h3>
+                <p className="text-xs text-slate-500">Tindakan ini tidak dapat dibatalkan</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              Apakah Anda yakin ingin menghapus data calon{' '}
+              <strong className="text-slate-900 dark:text-white">{calonToDelete.nama}</strong> (
+              {calonToDelete.proyeksiJabatan}) dari daftar masa pelatihan seleksi?
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setCalonToDelete(null)}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteCalon) {
+                    onDeleteCalon(calonToDelete.id);
+                  }
+                  setCalonToDelete(null);
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer"
+              >
+                Ya, Hapus Data
+              </button>
+            </div>
           </div>
         </div>
       )}

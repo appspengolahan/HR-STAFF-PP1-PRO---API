@@ -8635,21 +8635,7 @@ export const INITIAL_MUTASI_LIST: MutasiRecord[] = [
 
 export const INITIAL_LINKS = INITIAL_LINKS_LIST;
 
-export const INITIAL_CALON_LIST: CalonKaryawan[] = [
-  {
-    id: "calon-001",
-    nama: "Bayu Pratama",
-    proyeksiJabatan: "Operator Mesin KT 2",
-    sekup: "Operasional",
-    tanggalMulai: "2026-09-15",
-    tanggalAkhir: "2026-10-15",
-    durasiHari: 30,
-    sisaHari: 11,
-    status: "Sedang Berjalan",
-    statusPelatihan: "Sedang Berjalan",
-    jumlahPerpanjangan: 0,
-    alert: false
-  }
-];
+export const INITIAL_CALON_LIST: CalonKaryawan[] = [];
+
 
 

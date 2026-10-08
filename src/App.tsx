@@ -511,6 +511,11 @@ export default function App() {
     setCalonList(updated);
   };
 
+  const handleDeleteCalon = (calonId: string) => {
+    storageService.deleteCalon(calonId);
+    setCalonList(storageService.getCalonList());
+  };
+
   // Handlers for Links
   const handleAddLink = (link: LinkArsip) => {
     storageService.addLink(link);
@@ -692,6 +697,7 @@ export default function App() {
               onGraduateCalon={handleGraduateCalon}
               onExtendCalon={handleExtendCalon}
               onFailCalon={handleFailCalon}
+              onDeleteCalon={handleDeleteCalon}
             />
           )}
 
