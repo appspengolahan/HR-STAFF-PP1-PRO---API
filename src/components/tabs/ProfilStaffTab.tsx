@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   UserCircle,
   FileText,
@@ -14,6 +14,10 @@ import {
   DollarSign,
   ShieldCheck,
   CheckCircle2,
+  Search,
+  ChevronDown,
+  Check,
+  X,
 } from 'lucide-react';
 import { StaffData, PresensiRecord, LinkArsip, AuthUser } from '../../types';
 import { formatRupiah, NAMA_BULAN_INDO } from '../../services/payrollEngine';
@@ -45,6 +49,80 @@ export const ProfilStaffTab: React.FC<ProfilStaffTabProps> = ({
       : selectedStaffNip || staffList[0]?.nip || 'BK-PP1-001';
 
   const [activeNip, setActiveNip] = useState<string>(initialNip);
+
+  // Searchable Dropdown (Mode Saran) State
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync if selectedStaffNip prop changes from outside
+  useEffect(() => {
+    if (selectedStaffNip) {
+      setActiveNip(selectedStaffNip);
+    }
+  }, [selectedStaffNip]);
+
+  // Click outside to close suggestion dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filtered staff suggestions
+  const suggestions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return staffList;
+    return staffList.filter((s) => {
+      const matchNama = s.nama.toLowerCase().includes(q);
+      const matchNip = s.nip.toLowerCase().includes(q);
+      const matchJabatan = s.jabatan ? s.jabatan.toLowerCase().includes(q) : false;
+      const matchSekup = s.sekup ? s.sekup.toLowerCase().includes(q) : false;
+      return matchNama || matchNip || matchJabatan || matchSekup;
+    });
+  }, [staffList, searchQuery]);
+
+  // Reset highlightedIndex when suggestions change
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [suggestions]);
+
+  const selectStaff = (nip: string) => {
+    setActiveNip(nip);
+    setSearchQuery('');
+    setIsDropdownOpen(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isDropdownOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        setIsDropdownOpen(true);
+        e.preventDefault();
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev + 1) % Math.max(1, suggestions.length));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev - 1 + suggestions.length) % Math.max(1, suggestions.length));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (suggestions[highlightedIndex]) {
+        selectStaff(suggestions[highlightedIndex].nip);
+      }
+    } else if (e.key === 'Escape') {
+      setIsDropdownOpen(false);
+    }
+  };
 
   // Link Form State
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
@@ -126,27 +204,168 @@ export const ProfilStaffTab: React.FC<ProfilStaffTabProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Selector (Only if not staff portal) */}
+      {/* Selector with Typeable Suggestion Mode (Only if not staff portal) */}
       {!isStaffPortal && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex items-center justify-between no-print">
-          <div className="flex items-center gap-2">
-            <UserCircle className="w-5 h-5 text-blue-500" />
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-              Pilih Profil Staf untuk Ditampilkan:
-            </span>
-          </div>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs no-print">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            {/* Left Label & Currently Active Staff */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-850 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                <UserCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Pilih Profil Karyawan
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                    Mode Saran Cepat
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Sedang menampilkan: <strong className="text-blue-600 dark:text-blue-400">{currentStaff.nama}</strong> ({currentStaff.nip})
+                </p>
+              </div>
+            </div>
 
-          <select
-            value={activeNip}
-            onChange={(e) => setActiveNip(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-white"
-          >
-            {staffList.map((s) => (
-              <option key={s.nip} value={s.nip}>
-                {s.nama} ({s.nip} — {s.jabatan})
-              </option>
-            ))}
-          </select>
+            {/* Right: Searchable Typeable Combobox */}
+            <div ref={dropdownRef} className="relative w-full md:w-96">
+              <div className="relative flex items-center">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    if (!isDropdownOpen) setIsDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsDropdownOpen(true)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ketik nama, NIP, atau jabatan..."
+                  className="w-full pl-9 pr-16 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-inner"
+                />
+
+                <div className="absolute right-2 flex items-center gap-0.5">
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery('');
+                        inputRef.current?.focus();
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                      title="Hapus ketikan"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDropdownOpen((prev) => !prev);
+                      inputRef.current?.focus();
+                    }}
+                    className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                    title={isDropdownOpen ? 'Tutup daftar' : 'Buka daftar saran'}
+                  >
+                    <ChevronDown
+                      className={`w-4 h-4 transition-transform duration-200 ${
+                        isDropdownOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : ''
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Suggestions Dropdown Menu */}
+              {isDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-80 flex flex-col animate-in fade-in slide-in-from-top-1 duration-150">
+                  {/* Dropdown Header */}
+                  <div className="px-3.5 py-2 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                    <span>
+                      {searchQuery
+                        ? `Hasil Pencarian (${suggestions.length})`
+                        : `Daftar Staf (${suggestions.length})`}
+                    </span>
+                    <span className="text-[10px] text-slate-400">Tekan Enter / Klik</span>
+                  </div>
+
+                  {/* Suggestions List */}
+                  <div className="overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 p-1">
+                    {suggestions.length > 0 ? (
+                      suggestions.map((staff, index) => {
+                        const isSelected = staff.nip === activeNip;
+                        const isHighlighted = index === highlightedIndex;
+                        return (
+                          <button
+                            key={staff.nip}
+                            type="button"
+                            onClick={() => selectStaff(staff.nip)}
+                            onMouseEnter={() => setHighlightedIndex(index)}
+                            className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between gap-3 transition-colors cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-50/90 dark:bg-blue-950/50 text-blue-950 dark:text-blue-100 font-semibold'
+                                : isHighlighted
+                                ? 'bg-slate-100 dark:bg-slate-800/80 text-slate-900 dark:text-white'
+                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
+                                  isSelected
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                                }`}
+                              >
+                                {staff.nama.substring(0, 2).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold truncate flex items-center gap-2">
+                                  <span>{staff.nama}</span>
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono font-normal">
+                                    {staff.nip}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                  {staff.jabatan} • {staff.sekup}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span
+                                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                  staff.statusAktif === 'Aktif'
+                                    ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                                    : 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300'
+                                }`}
+                              >
+                                {staff.status}
+                              </span>
+                              {isSelected && (
+                                <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="py-6 px-4 text-center">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Tidak ada staf yang cocok dengan &quot;<strong className="text-slate-700 dark:text-slate-200">{searchQuery}</strong>&quot;
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          Coba ketik nama lain atau NIP staf.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
