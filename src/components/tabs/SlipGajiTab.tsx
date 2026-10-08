@@ -771,7 +771,7 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
               <div className="text-[11px] text-slate-500 mb-1">Dibuat Oleh,</div>
               <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Payroll Keuangan</div>
               <div className="h-16 flex items-end justify-center font-bold font-mono">
-                ( Hendra Wijaya )
+                ( Yohana )
               </div>
             </div>
 
