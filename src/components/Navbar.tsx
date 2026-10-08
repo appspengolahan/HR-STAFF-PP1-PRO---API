@@ -17,6 +17,7 @@ import {
   Sliders,
   CheckCircle2,
   RefreshCw,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { AuthUser } from '../types';
 import { usePWAInstall } from '../hooks/usePWAInstall';
@@ -36,6 +37,10 @@ interface NavbarProps {
   isDevSupervisorVisible?: boolean;
   isAutoRefreshActive?: boolean;
   onToggleAutoRefresh?: () => void;
+  isDatasheetSourceActive?: boolean;
+  onToggleDatasheetSource?: () => void;
+  onManualSyncDatasheet?: () => void;
+  isSyncing?: boolean;
   onOpenColumnSettings?: () => void;
 }
 
@@ -54,6 +59,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   isDevSupervisorVisible = false,
   isAutoRefreshActive = true,
   onToggleAutoRefresh,
+  isDatasheetSourceActive = false,
+  onToggleDatasheetSource,
+  onManualSyncDatasheet,
+  isSyncing = false,
   onOpenColumnSettings,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -205,6 +214,41 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         )}
 
+        {/* Toggle Alternatif: Tarik Dari Datasheet (Langsung Baca Google Sheets CSV) */}
+        {onToggleDatasheetSource && (
+          <button
+            onClick={onToggleDatasheetSource}
+            title={
+              isDatasheetSourceActive
+                ? 'Mode Datasheet AKTIF (Alternatif Langsung CSV): Penarikan data diprioritaskan langsung ke file Google Spreadsheet (MASTER_STAFF & LOG_PRESENSI). Klik untuk kembali ke REST API GAS.'
+                : 'Mode REST API GAS Aktif. Klik untuk mengaktifkan alternatif "Tarik Dari Datasheet" (langsung baca CSV Google Spreadsheet).'
+            }
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer select-none text-xs font-semibold ${
+              isDatasheetSourceActive
+                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700 shadow-xs ring-1 ring-blue-400/20'
+                : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <FileSpreadsheet
+              className={`w-3.5 h-3.5 ${
+                isDatasheetSourceActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'
+              }`}
+            />
+            <span className="hidden md:inline-block">
+              {isDatasheetSourceActive ? 'Datasheet Live' : 'Tarik Datasheet'}
+            </span>
+            <span
+              className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                isDatasheetSourceActive
+                  ? 'bg-blue-200 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                  : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
+              }`}
+            >
+              {isDatasheetSourceActive ? 'CSV ON' : 'OFF'}
+            </span>
+          </button>
+        )}
+
         {/* Quick Theme Toggle Button */}
         <button
           onClick={onToggleTheme}
@@ -305,6 +349,36 @@ export const Navbar: React.FC<NavbarProps> = ({
                     Modul
                   </span>
                 </button>
+
+                {onToggleDatasheetSource && (
+                  <button
+                    onClick={() => {
+                      onToggleDatasheetSource();
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors text-left cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                        <FileSpreadsheet className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-xs">Alternatif: Tarik Dari Datasheet</div>
+                        <div className="text-[10px] text-slate-400">
+                          {isDatasheetSourceActive ? 'Aktif (Langsung CSV Spreadsheet)' : 'Nonaktif (Menggunakan REST GAS)'}
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        isDatasheetSourceActive
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                      }`}
+                    >
+                      {isDatasheetSourceActive ? 'CSV ON' : 'OFF'}
+                    </span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => {

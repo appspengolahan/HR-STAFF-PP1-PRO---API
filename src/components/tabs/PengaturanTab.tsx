@@ -13,6 +13,9 @@ import {
   Info,
   Layers,
   Sparkles,
+  RefreshCw,
+  FileSpreadsheet,
+  Zap,
 } from 'lucide-react';
 import { StaffData } from '../../types';
 import { ColumnVisibilitySettings, storageService } from '../../services/storageService';
@@ -23,6 +26,12 @@ interface PengaturanTabProps {
   onUpdateColumnSettings: (newSettings: ColumnVisibilitySettings) => void;
   onNavigateTab: (tabId: string) => void;
   staffList?: StaffData[];
+  isAutoRefreshActive?: boolean;
+  onToggleAutoRefresh?: () => void;
+  isDatasheetSourceActive?: boolean;
+  onToggleDatasheetSource?: () => void;
+  onManualSyncDatasheet?: () => void;
+  isSyncing?: boolean;
 }
 
 export const PengaturanTab: React.FC<PengaturanTabProps> = ({
@@ -30,6 +39,12 @@ export const PengaturanTab: React.FC<PengaturanTabProps> = ({
   onUpdateColumnSettings,
   onNavigateTab,
   staffList = [],
+  isAutoRefreshActive = true,
+  onToggleAutoRefresh,
+  isDatasheetSourceActive = false,
+  onToggleDatasheetSource,
+  onManualSyncDatasheet,
+  isSyncing = false,
 }) => {
   const handleToggle = (key: keyof ColumnVisibilitySettings) => {
     const updated = {
@@ -409,6 +424,160 @@ export const PengaturanTab: React.FC<PengaturanTabProps> = ({
           <p>
             2. <strong>Fleksibilitas Rekapitulasi:</strong> Jika HR hanya membutuhkan data administratif (kontak, jenjang pendidikan, masa PKWT), kolom finansial dapat disembunyikan agar tabel lebih ringkas.
           </p>
+        </div>
+      </div>
+
+      {/* Auto Refresh & Tarik Dari Datasheet Settings Section */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 sm:p-7 shadow-xs space-y-6">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+              Pengaturan Sinkronisasi Data &amp; Alternatif Datasheet
+            </h2>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+              Live Polling
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Atur mekanisme refresh otomatis (icon terus berputar) dan aktifkan alternatif penarikan data langsung dari Google Datasheet CSV.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Card 1: Auto Refresh */}
+          <div
+            onClick={onToggleAutoRefresh}
+            className={`p-5 rounded-2xl border-2 transition-all cursor-pointer select-none relative overflow-hidden group ${
+              isAutoRefreshActive
+                ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-500 dark:border-emerald-500 shadow-sm'
+                : 'bg-white dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 opacity-80'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-colors ${
+                    isAutoRefreshActive
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  <RefreshCw className={`w-6 h-6 ${isAutoRefreshActive ? 'animate-spin' : ''}`} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white flex items-center gap-2">
+                    Auto Sync / Auto Refresh
+                    {isAutoRefreshActive ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300">
+                        Aktif (Terus Berputar)
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                        Nonaktif
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Icon refresh pada Navbar terus berputar &amp; data terus terupdate otomatis tiap 30 detik
+                  </p>
+                </div>
+              </div>
+
+              {/* Custom Switch Toggle */}
+              <div className="pt-1">
+                <div
+                  className={`w-12 h-6 flex items-center rounded-full p-1 duration-300 cursor-pointer ${
+                    isAutoRefreshActive ? 'bg-emerald-600 justify-end' : 'bg-slate-300 dark:bg-slate-700 justify-start'
+                  }`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+              <span>Status Polling: <strong>{isAutoRefreshActive ? 'Background Aktif' : 'Berhenti'}</strong></span>
+              <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                {isAutoRefreshActive ? 'Interval: Tiap 30 detik' : 'Manual only'}
+              </span>
+            </div>
+          </div>
+
+          {/* Card 2: Tarik Dari Datasheet Toggle */}
+          <div
+            onClick={onToggleDatasheetSource}
+            className={`p-5 rounded-2xl border-2 transition-all cursor-pointer select-none relative overflow-hidden group ${
+              isDatasheetSourceActive
+                ? 'bg-blue-50/60 dark:bg-blue-950/20 border-blue-500 dark:border-blue-500 shadow-sm'
+                : 'bg-white dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 opacity-80'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-colors ${
+                    isDatasheetSourceActive
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  <FileSpreadsheet className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white flex items-center gap-2">
+                    Tarik Dari Datasheet
+                    {isDatasheetSourceActive ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+                        Alternatif CSV Aktif
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                        Mode Standar (GAS REST)
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Alternatif penarikan data langsung membaca file Google Sheets publik (MASTER_STAFF &amp; LOG_PRESENSI)
+                  </p>
+                </div>
+              </div>
+
+              {/* Custom Switch Toggle */}
+              <div className="pt-1">
+                <div
+                  className={`w-12 h-6 flex items-center rounded-full p-1 duration-300 cursor-pointer ${
+                    isDatasheetSourceActive ? 'bg-blue-600 justify-end' : 'bg-slate-300 dark:bg-slate-700 justify-start'
+                  }`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+              <span>Sumber Data: <strong>{isDatasheetSourceActive ? 'Google Sheets Live CSV' : 'GAS REST API (/exec)'}</strong></span>
+              <span className="font-mono text-blue-600 dark:text-blue-400">
+                {isDatasheetSourceActive ? 'Failover: ON' : 'REST Standard'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Button: Tarik dari Datasheet Sekarang */}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/60">
+          <div className="text-xs text-slate-600 dark:text-slate-300">
+            <strong>Penarikan Data Langsung:</strong> Butuh menyinkronkan data dari Datasheet sekarang juga secara manual?
+          </div>
+          {onManualSyncDatasheet && (
+            <button
+              onClick={onManualSyncDatasheet}
+              disabled={isSyncing}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Sedang Menarik Data...' : 'Tarik Data Dari Datasheet Sekarang'}</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -103,10 +103,36 @@ export default function App() {
   const [isSyncingPresensi, setIsSyncingPresensi] = useState(false);
   const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
 
+  // Alternatif Datasheet Source State (Tarik Langsung Google Sheets CSV)
+  const [isDatasheetSourceActive, setIsDatasheetSourceActive] = useState<boolean>(() => {
+    const saved = localStorage.getItem('BK_DATASHEET_SOURCE_ACTIVE');
+    return saved === 'true'; // Default false
+  });
+
   const handleSyncPresensiLive = useCallback(
-    async (isSilent = false) => {
+    async (isSilent = false, forceDatasheet = false) => {
       try {
         setIsSyncingPresensi(true);
+        const shouldPullFromDatasheet = forceDatasheet || isDatasheetSourceActive;
+
+        if (shouldPullFromDatasheet) {
+          // Tarik data langsung dari Google Sheets Asli HR Staff (1KzEFolz...)
+          const syncRes = await sheetSyncService.syncAllFromLiveSheet();
+          const latestPresensi = storageService.getPresensiList();
+          setPresensiList(latestPresensi);
+          setStaffList(storageService.getStaffList());
+          setLinksList(storageService.getLinksList());
+          setLemburList(storageService.getLemburList());
+          if (!isSilent) {
+            setSyncToastMessage(
+              `✓ [DATASHEET LIVE] Berhasil sinkronisasi ${syncRes.presensiCount} presensi & ${syncRes.staffCount} staf langsung dari Google Spreadsheet!`
+            );
+            setTimeout(() => setSyncToastMessage(null), 6000);
+          }
+          return;
+        }
+
+        // Mode Standar: GAS REST API
         const cfg = storageService.getGasConfig();
         const hasValidStaffGasUrl =
           cfg.apiUrl &&
@@ -120,23 +146,26 @@ export default function App() {
             const octCount = res.data.filter((r) => r.bulan === 10 && r.tahun === 2026).length;
             if (!isSilent) {
               setSyncToastMessage(
-                `✓ Berhasil sinkronisasi ${res.count} data presensi staf live dari GAS (${octCount} data di Oktober 2026, termasuk Matsukri 7 Okt)!`
+                `✓ [GAS REST] Berhasil sinkronisasi ${res.count} data presensi staf live dari GAS (${octCount} data di Oktober 2026, termasuk Matsukri 7 Okt)!`
               );
               setTimeout(() => setSyncToastMessage(null), 6000);
             }
+            return;
           }
-        } else {
-          // Tarik data langsung dari Google Sheets Asli HR Staff (1KzEFolz...)
-          const syncRes = await sheetSyncService.syncAllFromLiveSheet();
-          const latestPresensi = storageService.getPresensiList();
-          setPresensiList(latestPresensi);
-          setStaffList(storageService.getStaffList());
-          if (!isSilent) {
-            setSyncToastMessage(
-              `✓ Berhasil sinkronisasi ${syncRes.presensiCount} data presensi dari Google Sheet Staff Asli (Termasuk Matsukri 7 Okt)!`
-            );
-            setTimeout(() => setSyncToastMessage(null), 6000);
-          }
+        }
+
+        // Fallback: Tarik dari datasheet jika GAS tidak merespons
+        const syncRes = await sheetSyncService.syncAllFromLiveSheet();
+        const latestPresensi = storageService.getPresensiList();
+        setPresensiList(latestPresensi);
+        setStaffList(storageService.getStaffList());
+        setLinksList(storageService.getLinksList());
+        setLemburList(storageService.getLemburList());
+        if (!isSilent) {
+          setSyncToastMessage(
+            `✓ [FALLBACK DATASHEET] Berhasil sinkronisasi ${syncRes.presensiCount} data presensi dari Google Sheet Staff!`
+          );
+          setTimeout(() => setSyncToastMessage(null), 6000);
         }
       } catch (err) {
         console.warn('Gagal sync presensi staf:', err);
@@ -148,8 +177,28 @@ export default function App() {
         setIsSyncingPresensi(false);
       }
     },
-    [staffList]
+    [staffList, isDatasheetSourceActive]
   );
+
+  const handleToggleDatasheetSource = () => {
+    setIsDatasheetSourceActive((prev) => {
+      const next = !prev;
+      localStorage.setItem('BK_DATASHEET_SOURCE_ACTIVE', String(next));
+      if (next) {
+        setSyncToastMessage('Mode Alternatif Aktif: Penarikan data dialihkan langsung ke file Google Datasheet (CSV)!');
+        setTimeout(() => setSyncToastMessage(null), 5000);
+        handleSyncPresensiLive(false, true);
+      } else {
+        setSyncToastMessage('Mode Standar Aktif: Penarikan data diarahkan ke GAS REST API.');
+        setTimeout(() => setSyncToastMessage(null), 4000);
+      }
+      return next;
+    });
+  };
+
+  const handleManualSyncDatasheet = () => {
+    handleSyncPresensiLive(false, true);
+  };
 
   // Auto-sync on app load & when window regains focus
   useEffect(() => {
@@ -511,6 +560,10 @@ export default function App() {
         isDevSupervisorVisible={isDevSupervisorVisible}
         isAutoRefreshActive={isAutoRefreshActive}
         onToggleAutoRefresh={handleToggleAutoRefresh}
+        isDatasheetSourceActive={isDatasheetSourceActive}
+        onToggleDatasheetSource={handleToggleDatasheetSource}
+        onManualSyncDatasheet={handleManualSyncDatasheet}
+        isSyncing={isSyncingPresensi}
         onOpenColumnSettings={() => setIsColumnSettingsOpen(true)}
       />
 
@@ -668,6 +721,12 @@ export default function App() {
               onUpdateColumnSettings={handleUpdateColumnSettings}
               onNavigateTab={(tab) => setActiveTab(tab)}
               staffList={staffList}
+              isAutoRefreshActive={isAutoRefreshActive}
+              onToggleAutoRefresh={handleToggleAutoRefresh}
+              isDatasheetSourceActive={isDatasheetSourceActive}
+              onToggleDatasheetSource={handleToggleDatasheetSource}
+              onManualSyncDatasheet={handleManualSyncDatasheet}
+              isSyncing={isSyncingPresensi}
             />
           )}
         </main>
