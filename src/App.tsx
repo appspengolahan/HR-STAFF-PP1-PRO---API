@@ -147,6 +147,36 @@ export default function App() {
     return () => window.removeEventListener('focus', handleFocus);
   }, [handleSyncPresensiLive]);
 
+  // Auto-Refresh Background Polling Toggle (Icon terus berputar di Navbar & data selalu terupdate)
+  const [isAutoRefreshActive, setIsAutoRefreshActive] = useState<boolean>(() => {
+    const saved = localStorage.getItem('BK_AUTO_REFRESH_ACTIVE');
+    return saved !== null ? saved === 'true' : true; // Default AKTIF (terus berjalan)
+  });
+
+  const handleToggleAutoRefresh = () => {
+    setIsAutoRefreshActive((prev) => {
+      const next = !prev;
+      localStorage.setItem('BK_AUTO_REFRESH_ACTIVE', String(next));
+      if (next) {
+        // Langsung picu sinkronisasi saat diaktifkan
+        handleSyncPresensiLive(false);
+      }
+      return next;
+    });
+  };
+
+  // Efek interval polling background refresh saat aktif
+  useEffect(() => {
+    if (!isAutoRefreshActive) return;
+
+    // Refresh background berkala setiap 30 detik agar data selalu terupdate
+    const interval = setInterval(() => {
+      handleSyncPresensiLive(true);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [isAutoRefreshActive, handleSyncPresensiLive]);
+
   // Apply Theme Mode class on HTML
   useEffect(() => {
     const root = document.documentElement;
@@ -465,6 +495,8 @@ export default function App() {
         onTriggerSecretDoor={() => setSecretDoorTriggered(true)}
         sidebarCollapsed={sidebarCollapsed}
         isDevSupervisorVisible={isDevSupervisorVisible}
+        isAutoRefreshActive={isAutoRefreshActive}
+        onToggleAutoRefresh={handleToggleAutoRefresh}
       />
 
       {/* Sidebar for Desktop / Tablet */}

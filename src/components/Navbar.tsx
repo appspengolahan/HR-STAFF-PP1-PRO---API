@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Sliders,
   CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
 import { AuthUser } from '../types';
 import { usePWAInstall } from '../hooks/usePWAInstall';
@@ -33,6 +34,8 @@ interface NavbarProps {
   onTriggerSecretDoor: () => void;
   sidebarCollapsed: boolean;
   isDevSupervisorVisible?: boolean;
+  isAutoRefreshActive?: boolean;
+  onToggleAutoRefresh?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -48,6 +51,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onTriggerSecretDoor,
   sidebarCollapsed,
   isDevSupervisorVisible = false,
+  isAutoRefreshActive = true,
+  onToggleAutoRefresh,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
@@ -163,8 +168,41 @@ export const Navbar: React.FC<NavbarProps> = ({
         ))}
       </div>
 
-      {/* SISI KANAN: Shortcut Cepat Tema + Satu Toggle Dropdown Terpadu */}
+      {/* SISI KANAN: Auto Refresh Toggle + Shortcut Tema + Satu Toggle Dropdown Terpadu */}
       <div className="flex items-center gap-2 shrink-0">
+        {/* Toggle Auto Refresh (Terus Berjalan & Berputar Terus Menerus) */}
+        {onToggleAutoRefresh && (
+          <button
+            onClick={onToggleAutoRefresh}
+            title={
+              isAutoRefreshActive
+                ? 'Auto Refresh Aktif (Icon terus berputar & data otomatis terupdate dari Spreadsheet). Klik untuk mematikan.'
+                : 'Auto Refresh Nonaktif. Klik untuk mengaktifkan pembaruan data otomatis terus menerus.'
+            }
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer select-none text-xs font-semibold ${
+              isAutoRefreshActive
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 shadow-xs ring-1 ring-emerald-400/20'
+                : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${
+                isAutoRefreshActive
+                  ? 'animate-spin text-emerald-600 dark:text-emerald-400'
+                  : 'text-slate-400'
+              }`}
+            />
+            <span className="hidden sm:inline-block">
+              {isAutoRefreshActive ? 'Auto Refresh ON' : 'Auto Refresh'}
+            </span>
+            <span
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                isAutoRefreshActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+              }`}
+            />
+          </button>
+        )}
+
         {/* Quick Theme Toggle Button */}
         <button
           onClick={onToggleTheme}
