@@ -28,8 +28,6 @@ interface NavbarProps {
   onOpenHelp: () => void;
   onOpenSwitchBoard: () => void;
   onOpenGasCenter: () => void;
-  selectedDept: 'Semua' | 'Operasional' | 'Administrasi';
-  onChangeDept: (dept: 'Semua' | 'Operasional' | 'Administrasi') => void;
   themeMode: 'light' | 'dark';
   onToggleTheme: () => void;
   onTriggerSecretDoor: () => void;
@@ -50,8 +48,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenHelp,
   onOpenSwitchBoard,
   onOpenGasCenter,
-  selectedDept,
-  onChangeDept,
   themeMode,
   onToggleTheme,
   onTriggerSecretDoor,
@@ -160,23 +156,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             HR Staff &amp; Karyawan — Divisi Produksi I
           </p>
         </div>
-      </div>
-
-      {/* SISI TENGAH: Filter Unit Kerja (Ringkas & Fleksibel) */}
-      <div className="hidden lg:flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs shrink-0 mx-2">
-        {(['Semua', 'Operasional', 'Administrasi'] as const).map((dept) => (
-          <button
-            key={dept}
-            onClick={() => onChangeDept(dept)}
-            className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-              selectedDept === dept
-                ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            {dept}
-          </button>
-        ))}
       </div>
 
       {/* SISI KANAN: Auto Refresh Toggle + Shortcut Tema + Satu Toggle Dropdown Terpadu */}

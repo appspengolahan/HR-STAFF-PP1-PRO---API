@@ -1360,6 +1360,26 @@ export const INITIAL_LINKS_LIST: LinkArsip[] = [
 
 export const INITIAL_PRESENSI_LIST: PresensiRecord[] = [
   {
+    "id": "pr-359",
+    "rowNum": 359,
+    "tanggal": "2026-10-09",
+    "hari": "Jumat",
+    "nip": "BK-PP1-017",
+    "nama": "Dedik Anwar",
+    "jamAwal": "08:00",
+    "jamAkhir": "10:00",
+    "durasiMenit": 120,
+    "jenisIjin": "Ijin Terlambat",
+    "faktorPotongan": 0.0,
+    "keperluan": "Keperluan Pribadi / Keluarga",
+    "lampiranSurat": "Tidak",
+    "catatan": "Form Ijin Pengecualian",
+    "bulan": 10,
+    "tahun": 2026,
+    "shift": "Shift 1",
+    "geofenceValid": true
+  },
+  {
     "id": "pr-358",
     "rowNum": 358,
     "tanggal": "2026-10-08",

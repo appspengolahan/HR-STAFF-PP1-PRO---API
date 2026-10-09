@@ -71,7 +71,6 @@ export default function App() {
     return 'dashboard';
   });
 
-  const [selectedDept, setSelectedDept] = useState<'Semua' | 'Operasional' | 'Administrasi'>('Semua');
   const [viewingProfileNip, setViewingProfileNip] = useState<string | undefined>(undefined);
 
   // Modals & Panels
@@ -142,8 +141,9 @@ export default function App() {
           const res = await gasClient.fetchPresensi(cfg.apiUrl, staffList);
           if (res.status === 'success' && res.data && res.data.length > 0) {
             storageService.savePresensiList(res.data);
-            setPresensiList(res.data);
-            const octCount = res.data.filter((r) => r.bulan === 10 && r.tahun === 2026).length;
+            const mergedPresensi = storageService.getPresensiList();
+            setPresensiList(mergedPresensi);
+            const octCount = mergedPresensi.filter((r) => r.bulan === 10 && r.tahun === 2026).length;
             if (!isSilent) {
               setSyncToastMessage(
                 `✓ [GAS REST] Berhasil sinkronisasi ${res.count} data presensi staf live dari GAS (${octCount} data di Oktober 2026, termasuk Matsukri 7 Okt)!`
@@ -416,11 +416,23 @@ export default function App() {
   const handleAddPresensi = (rec: PresensiRecord) => {
     storageService.addPresensi(rec);
     setPresensiList(storageService.getPresensiList());
+
+    const cfg = storageService.getGasConfig();
+    if (cfg.apiUrl) {
+      gasClient.pushPresensi(cfg.apiUrl, rec).catch((e) => console.warn('Gagal push presensi ke GAS:', e));
+    }
   };
 
   const handleAddPresensiBatch = (records: PresensiRecord[]) => {
     storageService.addPresensiBatch(records);
     setPresensiList(storageService.getPresensiList());
+
+    const cfg = storageService.getGasConfig();
+    if (cfg.apiUrl) {
+      for (const rec of records) {
+        gasClient.pushPresensi(cfg.apiUrl, rec).catch((e) => console.warn('Gagal push presensi ke GAS:', e));
+      }
+    }
   };
 
   const handleDeletePresensi = (id: string) => {
@@ -556,8 +568,6 @@ export default function App() {
         onOpenHelp={() => setIsHelpOpen(true)}
         onOpenSwitchBoard={() => setIsSwitchBoardOpen(true)}
         onOpenGasCenter={() => setIsGasCenterOpen(true)}
-        selectedDept={selectedDept}
-        onChangeDept={setSelectedDept}
         themeMode={themeMode}
         onToggleTheme={handleToggleTheme}
         onTriggerSecretDoor={() => setSecretDoorTriggered(true)}
@@ -601,7 +611,6 @@ export default function App() {
               presensiList={presensiList}
               lemburList={lemburList}
               onNavigateTab={setActiveTab}
-              selectedDept={selectedDept}
             />
           )}
 

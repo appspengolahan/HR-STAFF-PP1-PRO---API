@@ -32,6 +32,7 @@ export interface ColumnVisibilitySettings {
 const KEYS = {
   STAFF: 'bk_hr_staff_list_v3',
   PRESENSI: 'bk_hr_presensi_list_v3',
+  PRESENSI_MANUAL: 'bk_hr_presensi_manual_v3',
   LEMBUR: 'bk_hr_lembur_list_v3',
   CUTI: 'bk_hr_cuti_list_v3',
   MUTASI: 'bk_hr_mutasi_list_v3',
@@ -148,18 +149,47 @@ export const storageService = {
   },
 
   // Presensi
+  getManualPresensiList(): PresensiRecord[] {
+    return readStorage<PresensiRecord[]>(KEYS.PRESENSI_MANUAL, []);
+  },
+  saveManualPresensiList(list: PresensiRecord[]): void {
+    writeStorage(KEYS.PRESENSI_MANUAL, list);
+  },
   getPresensiList(): PresensiRecord[] {
     const list = readStorage<PresensiRecord[]>(KEYS.PRESENSI, INITIAL_PRESENSI_LIST);
+    const manualList = this.getManualPresensiList();
+
     const hasMatsukriOct7 = list && list.some(
       (p) => (p.tanggal === '2026-10-07' || p.tanggal === '07/10/2026') && p.nama.toLowerCase().includes('matsukri')
     );
+    const hasDedikOct9 =
+      (manualList && manualList.some((p) => p.nip === 'BK-PP1-017' && (p.tanggal === '2026-10-09' || p.tanggal === '09/10/2026'))) ||
+      (list && list.some((p) => p.nip === 'BK-PP1-017' && (p.tanggal === '2026-10-09' || p.tanggal === '09/10/2026')));
+
     const hasSumiati = list && list.some((p) => p.nama.toUpperCase().includes('SUMIATI'));
-    const sourceList = (!list || list.length < 358 || !hasMatsukriOct7 || hasSumiati)
+    const baseList = (!list || list.length < 358 || !hasMatsukriOct7 || hasSumiati)
       ? INITIAL_PRESENSI_LIST
       : list;
 
+    // Pastikan jika ada data Dedik Anwar dari INITIAL_PRESENSI_LIST yang belum tersimpan di local storage pengguna, otomatis disertakan ke manualList
+    if (!hasDedikOct9) {
+      const dedikRec = INITIAL_PRESENSI_LIST.find(
+        (p) => p.nip === 'BK-PP1-017' && p.tanggal === '2026-10-09'
+      );
+      if (dedikRec && !manualList.some((m) => m.id === dedikRec.id)) {
+        manualList.unshift(dedikRec);
+        writeStorage(KEYS.PRESENSI_MANUAL, manualList);
+      }
+    }
+
+    // Pastikan seluruh data input manual lokal selalu disertakan paling atas (tidak pernah hilang)
+    const combined = [
+      ...manualList,
+      ...baseList.filter((b) => !manualList.some((m) => m.id === b.id)),
+    ];
+
     // Normalisasi faktor potongan presisi (agar data presensi sinkron lama otomatis ter-update)
-    return sourceList.map((p) => {
+    return combined.map((p) => {
       const eff = getEffectiveFaktorPotongan(p);
       if (eff > 0 && (p.faktorPotongan === 0 || p.faktorPotongan === undefined)) {
         return { ...p, faktorPotongan: eff };
@@ -168,26 +198,52 @@ export const storageService = {
     });
   },
   savePresensiList(list: PresensiRecord[]): void {
-    writeStorage(KEYS.PRESENSI, list);
+    // Saat sinkronisasi dari Google Sheets/GAS dijalankan, data manual lokal tetap dipertahankan
+    const manualList = this.getManualPresensiList();
+    const merged = [
+      ...manualList,
+      ...list.filter((item) => !manualList.some((m) => m.id === item.id)),
+    ];
+    writeStorage(KEYS.PRESENSI, merged);
   },
   addPresensi(rec: PresensiRecord): void {
+    const manual = this.getManualPresensiList();
+    const updatedManual = [rec, ...manual.filter((m) => m.id !== rec.id)];
+    this.saveManualPresensiList(updatedManual);
+
     const list = this.getPresensiList();
-    list.unshift(rec);
-    this.savePresensiList(list);
+    const updatedList = [rec, ...list.filter((l) => l.id !== rec.id)];
+    writeStorage(KEYS.PRESENSI, updatedList);
   },
   addPresensiBatch(records: PresensiRecord[]): void {
+    const manual = this.getManualPresensiList();
+    const recordIds = new Set(records.map((r) => r.id));
+    const updatedManual = [...records, ...manual.filter((m) => !recordIds.has(m.id))];
+    this.saveManualPresensiList(updatedManual);
+
     const list = this.getPresensiList();
-    this.savePresensiList([...records, ...list]);
+    const updatedList = [...records, ...list.filter((l) => !recordIds.has(l.id))];
+    writeStorage(KEYS.PRESENSI, updatedList);
   },
   updatePresensi(id: string, updatedRec: Partial<PresensiRecord>): void {
+    const manual = this.getManualPresensiList();
+    const mIdx = manual.findIndex((m) => m.id === id);
+    if (mIdx !== -1) {
+      manual[mIdx] = { ...manual[mIdx], ...updatedRec };
+      this.saveManualPresensiList(manual);
+    }
+
     const list = this.getPresensiList();
     const idx = list.findIndex((p) => p.id === id);
     if (idx !== -1) {
       list[idx] = { ...list[idx], ...updatedRec };
-      this.savePresensiList(list);
+      writeStorage(KEYS.PRESENSI, list);
     }
   },
   deletePresensi(id: string, deletedBy: string): void {
+    const manual = this.getManualPresensiList().filter((m) => m.id !== id);
+    this.saveManualPresensiList(manual);
+
     const list = this.getPresensiList();
     const target = list.find((p) => p.id === id);
     if (target) {
@@ -200,7 +256,7 @@ export const storageService = {
         nip: target.nip,
         detailJson: JSON.stringify(target),
       });
-      this.savePresensiList(list.filter((p) => p.id !== id));
+      writeStorage(KEYS.PRESENSI, list.filter((p) => p.id !== id));
     }
   },
 

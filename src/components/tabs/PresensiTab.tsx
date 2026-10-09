@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   CalendarCheck2,
   Plus,
@@ -15,11 +15,12 @@ import {
   X,
   Check,
   RefreshCw,
+  ChevronDown,
 } from 'lucide-react';
 import { PresensiRecord, StaffData, JenisIjin } from '../../types';
 import { NAMA_BULAN_INDO } from '../../services/payrollEngine';
 import { SuratIjinModal } from '../modals/SuratIjinModal';
-import { getNamaHariIndo } from '../../utils/dateFormatter';
+import { getNamaHariIndo, formatTanggalDmy, getTodayIsoDate } from '../../utils/dateFormatter';
 
 interface PresensiTabProps {
   presensiList: PresensiRecord[];
@@ -65,7 +66,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
 
   // Form State
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [formTglAwal, setFormTglAwal] = useState(now.toISOString().split('T')[0]);
+  const [formTglAwal, setFormTglAwal] = useState(() => getTodayIsoDate());
   const [formTglAkhir, setFormTglAkhir] = useState('');
   const [formStaffNip, setFormStaffNip] = useState(isStaffPortal && currentUserNip ? currentUserNip : '');
   const [formJenisIjin, setFormJenisIjin] = useState<JenisIjin>('Ijin Terlambat');
@@ -75,6 +76,91 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   const [formKeperluan, setFormKeperluan] = useState('');
   const [formLampiran, setFormLampiran] = useState<'Ya' | 'Tidak'>('Tidak');
   const [formCatatan, setFormCatatan] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  // Searchable Staff Combobox (Mode Saran - Hanya Nama)
+  const [staffSearchQuery, setStaffSearchQuery] = useState('');
+  const [isStaffDropdownOpen, setIsStaffDropdownOpen] = useState(false);
+  const [highlightedStaffIdx, setHighlightedStaffIdx] = useState(0);
+  const staffDropdownRef = useRef<HTMLDivElement>(null);
+  const staffInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-hide success toast after 6 seconds
+  useEffect(() => {
+    if (successToast) {
+      const timer = setTimeout(() => setSuccessToast(null), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [successToast]);
+
+  // Sync staffSearchQuery when formStaffNip changes
+  useEffect(() => {
+    if (formStaffNip) {
+      const st = staffList.find((s) => s.nip === formStaffNip);
+      if (st) {
+        setStaffSearchQuery(st.nama);
+      }
+    } else {
+      setStaffSearchQuery('');
+    }
+  }, [formStaffNip, staffList]);
+
+  // Click-outside listener for staff combobox
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (staffDropdownRef.current && !staffDropdownRef.current.contains(e.target as Node)) {
+        setIsStaffDropdownOpen(false);
+        const st = staffList.find((s) => s.nip === formStaffNip);
+        if (st) {
+          setStaffSearchQuery(st.nama);
+        } else if (!formStaffNip) {
+          setStaffSearchQuery('');
+        }
+      }
+    };
+    if (isStaffDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isStaffDropdownOpen, formStaffNip, staffList]);
+
+  // Staff suggestions filtered only by name / nip
+  const staffSuggestions = useMemo(() => {
+    const q = staffSearchQuery.trim().toLowerCase();
+    if (!q) return staffList;
+    return staffList.filter((s) => s.nama.toLowerCase().includes(q) || s.nip.toLowerCase().includes(q));
+  }, [staffList, staffSearchQuery]);
+
+  const handleSelectStaff = (s: StaffData) => {
+    setFormStaffNip(s.nip);
+    setStaffSearchQuery(s.nama);
+    setIsStaffDropdownOpen(false);
+    setFormError(null);
+  };
+
+  const handleStaffKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isStaffDropdownOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      setIsStaffDropdownOpen(true);
+      return;
+    }
+    if (!isStaffDropdownOpen) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedStaffIdx((prev) => (prev + 1 < staffSuggestions.length ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedStaffIdx((prev) => (prev - 1 >= 0 ? prev - 1 : staffSuggestions.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (staffSuggestions[highlightedStaffIdx]) {
+        handleSelectStaff(staffSuggestions[highlightedStaffIdx]);
+      }
+    } else if (e.key === 'Escape') {
+      setIsStaffDropdownOpen(false);
+    }
+  };
 
   // Surat Ijin Modal
   const [selectedRecordForSurat, setSelectedRecordForSurat] = useState<PresensiRecord | null>(null);
@@ -165,13 +251,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
 
   // Helper to format date as DD/MM/YYYY
   const formatTanggalDisplay = (tgl: string): string => {
-    if (!tgl) return '-';
-    if (tgl.includes('/')) return tgl;
-    const parts = tgl.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parts[0]}`;
-    }
-    return tgl;
+    return formatTanggalDmy(tgl);
   };
 
   // Filtered List - Sorted Descending by Date (Terbaru di paling atas, terlama di paling bawah)
@@ -207,22 +287,44 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
 
   const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
-    const st = staffList.find((s) => s.nip === formStaffNip);
+    setFormError(null);
+    let st = staffList.find((s) => s.nip === formStaffNip);
+    if (!st && staffSearchQuery.trim()) {
+      const q = staffSearchQuery.trim().toLowerCase();
+      const matched = staffList.filter(
+        (s) => s.nama.toLowerCase() === q || s.nama.toLowerCase().includes(q)
+      );
+      if (matched.length > 0) {
+        st = matched[0];
+        setFormStaffNip(st.nip);
+      }
+    }
     if (!st) {
-      alert('Pilih karyawan terlebih dahulu.');
+      setFormError('Silakan pilih karyawan staf terlebih dahulu dari daftar saran.');
       return;
     }
 
-    const tglAwal = new Date(formTglAwal);
-    const tglAkhir = formTglAkhir ? new Date(formTglAkhir) : tglAwal;
+    if (!formTglAwal) {
+      setFormError('Tanggal awal wajib diisi.');
+      return;
+    }
+
+    const [yAwal, mAwal, dAwal] = formTglAwal.split('-').map(Number);
+    const tglAwal = new Date(yAwal, mAwal - 1, dAwal);
+
+    let tglAkhir = tglAwal;
+    if (formTglAkhir) {
+      const [yAkhir, mAkhir, dAkhir] = formTglAkhir.split('-').map(Number);
+      tglAkhir = new Date(yAkhir, mAkhir - 1, dAkhir);
+    }
 
     if (tglAkhir < tglAwal) {
-      alert('Tanggal Akhir tidak boleh sebelum Tanggal Awal.');
+      setFormError('Tanggal Akhir tidak boleh sebelum Tanggal Awal.');
       return;
     }
 
     const recordsToAdd: PresensiRecord[] = [];
-    const cur = new Date(tglAwal);
+    const cur = new Date(yAwal, mAwal - 1, dAwal);
 
     while (cur <= tglAkhir) {
       const dayOfWeek = cur.getDay(); // 0 is Sunday
@@ -230,10 +332,13 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
         // Skip Minggu (hari kerja Senin-Sabtu)
         const hariNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
         const hariStr = hariNames[dayOfWeek];
-        const dateStr = cur.toISOString().split('T')[0];
+        const yyyy = cur.getFullYear();
+        const mm = String(cur.getMonth() + 1).padStart(2, '0');
+        const dd = String(cur.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}-${mm}-${dd}`;
 
-        let jamAwal = formJamAwal;
-        let jamAkhir = formJamAkhir;
+        let jamAwal = formJamAwal || '08:00';
+        let jamAkhir = formJamAkhir || '10:00';
         let durasi = 0;
 
         if (formSehariPenuh) {
@@ -247,7 +352,6 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
             durasi = 420;
           }
         } else {
-          // Calculate minutes between jamAwal and jamAkhir
           const [h1, m1] = jamAwal.split(':').map(Number);
           const [h2, m2] = jamAkhir.split(':').map(Number);
           durasi = Math.max(0, (h2 * 60 + m2) - (h1 * 60 + m1));
@@ -256,7 +360,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
         const faktor = computeFaktor(formJenisIjin, durasi);
 
         recordsToAdd.push({
-          id: `pr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: `pr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           tanggal: dateStr,
           hari: hariStr,
           nip: st.nip,
@@ -266,9 +370,9 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
           durasiMenit: durasi,
           jenisIjin: formJenisIjin,
           faktorPotongan: faktor,
-          keperluan: formKeperluan,
+          keperluan: formKeperluan || 'Keperluan Pribadi / Keluarga',
           lampiranSurat: formLampiran,
-          catatan: formCatatan,
+          catatan: formCatatan || 'Form Ijin Pengecualian',
           bulan: cur.getMonth() + 1,
           tahun: cur.getFullYear(),
           shift: st.shiftDefault || 'Shift 1',
@@ -279,15 +383,32 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
     }
 
     if (recordsToAdd.length === 0) {
-      alert('Tidak ada hari kerja dalam rentang tanggal yang dipilih (hanya hari Minggu).');
+      setFormError('Tidak ada hari kerja dalam rentang tanggal yang dipilih (hanya hari Minggu).');
       return;
     }
 
     onAddPresensiBatch(recordsToAdd);
+
+    // Auto-update filter table to match record so user immediately sees it
+    const firstRec = recordsToAdd[0];
+    if (firstRec) {
+      setFilterBulan(firstRec.bulan);
+      setFilterTahun(firstRec.tahun);
+      setFilterNama('');
+      setSearchQuery('');
+    }
+
+    setSuccessToast(
+      `✓ Data ijin ${st.nama} (${firstRec.jenisIjin}) tanggal ${formatTanggalDisplay(firstRec.tanggal)} berhasil disimpan dan tercatat permanen!`
+    );
+
     setIsFormOpen(false);
     // Reset form
+    setFormStaffNip(isStaffPortal && currentUserNip ? currentUserNip : '');
+    setStaffSearchQuery('');
     setFormKeperluan('');
     setFormCatatan('');
+    setFormError(null);
   };
 
   const handleExportPdf = () => {
@@ -306,6 +427,22 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Toast Notifikasi Berhasil Catat Ijin */}
+      {successToast && (
+        <div className="p-3.5 bg-emerald-600 text-white rounded-2xl shadow-md text-xs font-semibold flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-200 no-print">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-200" />
+            <span>{successToast}</span>
+          </div>
+          <button
+            onClick={() => setSuccessToast(null)}
+            className="p-1 hover:bg-emerald-700 rounded-lg transition-colors cursor-pointer text-emerald-200 hover:text-white"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Policy banner */}
       <div className="p-4 rounded-2xl bg-blue-50/80 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 text-xs text-blue-900 dark:text-blue-300 leading-relaxed no-print flex items-start gap-3 shadow-xs">
         <AlertCircle className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
@@ -392,7 +529,11 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
               </button>
             )}
             <button
-              onClick={() => setIsFormOpen(true)}
+              onClick={() => {
+                setFormTglAwal(getTodayIsoDate());
+                setFormTglAkhir('');
+                setIsFormOpen(true);
+              }}
               className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
             >
               <Plus className="w-4 h-4" />
@@ -589,21 +730,141 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                 </div>
               </div>
 
+              {formError && (
+                <div className="p-2.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              {/* Karyawan Staf: Mode Saran (Searchable & Hanya Nama) */}
               <div>
-                <label className="block font-semibold mb-1">Karyawan Staf</label>
-                <select
-                  required
-                  value={formStaffNip}
-                  onChange={(e) => setFormStaffNip(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg text-xs"
-                >
-                  <option value="">-- Pilih Staf --</option>
-                  {staffList.map((s) => (
-                    <option key={s.nip} value={s.nip}>
-                      {s.nama} ({s.nip} — {s.jabatan})
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold">
+                    Karyawan Staf <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 px-2 py-0.5 rounded-full">
+                    Mode Saran (Ketik Nama)
+                  </span>
+                </div>
+
+                <div ref={staffDropdownRef} className="relative">
+                  <div className="relative flex items-center">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+                    <input
+                      ref={staffInputRef}
+                      type="text"
+                      value={staffSearchQuery}
+                      onChange={(e) => {
+                        setStaffSearchQuery(e.target.value);
+                        setFormStaffNip('');
+                        setHighlightedStaffIdx(0);
+                        if (!isStaffDropdownOpen) setIsStaffDropdownOpen(true);
+                      }}
+                      onFocus={() => {
+                        setIsStaffDropdownOpen(true);
+                      }}
+                      onKeyDown={handleStaffKeyDown}
+                      placeholder="Ketik nama karyawan staf..."
+                      className="w-full pl-8 pr-16 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+
+                    <div className="absolute right-2 flex items-center gap-1">
+                      {staffSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStaffSearchQuery('');
+                            setFormStaffNip('');
+                            setIsStaffDropdownOpen(true);
+                            staffInputRef.current?.focus();
+                          }}
+                          className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-md transition-colors cursor-pointer"
+                          title="Bersihkan teks"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setIsStaffDropdownOpen(!isStaffDropdownOpen)}
+                        className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-md transition-colors cursor-pointer"
+                        title="Buka daftar pilihan"
+                      >
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                            isStaffDropdownOpen ? 'rotate-180 text-blue-600' : ''
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Suggestions Popover List - HANYA NAMA */}
+                  {isStaffDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-950/60 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider sticky top-0 backdrop-blur-xs flex items-center justify-between">
+                        <span>Pilih Nama Karyawan</span>
+                        <span>{staffSuggestions.length} staf</span>
+                      </div>
+
+                      {staffSuggestions.length === 0 ? (
+                        <div className="px-3 py-4 text-center text-slate-400 text-xs">
+                          Tidak ditemukan nama staf "{staffSearchQuery}"
+                        </div>
+                      ) : (
+                        staffSuggestions.map((st, idx) => {
+                          const isSelected = formStaffNip === st.nip;
+                          const isHighlighted = idx === highlightedStaffIdx;
+                          return (
+                            <button
+                              key={st.nip}
+                              type="button"
+                              onClick={() => handleSelectStaff(st)}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleSelectStaff(st);
+                              }}
+                              onMouseEnter={() => setHighlightedStaffIdx(idx)}
+                              className={`w-full px-3 py-2 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer text-xs ${
+                                isSelected
+                                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold'
+                                  : isHighlighted
+                                  ? 'bg-slate-100 dark:bg-slate-800/70 text-slate-900 dark:text-white'
+                                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 truncate">
+                                <div
+                                  className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-[10px] shrink-0 ${
+                                    isSelected
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                  }`}
+                                >
+                                  {st.nama.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="truncate font-medium">{st.nama}</span>
+                              </div>
+
+                              {isSelected && (
+                                <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected notification chip */}
+                {formStaffNip && (
+                  <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Terpilih: <strong>{staffList.find((s) => s.nip === formStaffNip)?.nama}</strong>
+                  </p>
+                )}
               </div>
 
               <div>
@@ -762,7 +1023,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                   >
                     {staffList.map((st) => (
                       <option key={st.nip} value={st.nip}>
-                        {st.nama} ({st.nip} - {st.jabatan})
+                        {st.nama}
                       </option>
                     ))}
                   </select>

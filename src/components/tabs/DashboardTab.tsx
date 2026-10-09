@@ -24,7 +24,7 @@ interface DashboardTabProps {
   presensiList: PresensiRecord[];
   lemburList: LemburRecord[];
   onNavigateTab: (tab: string) => void;
-  selectedDept: 'Semua' | 'Operasional' | 'Administrasi';
+  selectedDept?: 'Semua' | 'Operasional' | 'Administrasi';
 }
 
 // Koordinat Sentral Pabrik PT Batu Karang PP1 (-7.2504, 112.7688)
@@ -50,7 +50,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   presensiList,
   lemburList,
   onNavigateTab,
-  selectedDept,
+  selectedDept = 'Semua',
 }) => {
   const now = new Date();
   const [bebanBulan, setBebanBulan] = useState<number>(now.getMonth() + 1);
