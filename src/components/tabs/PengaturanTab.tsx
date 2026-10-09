@@ -66,8 +66,8 @@ export const PengaturanTab: React.FC<PengaturanTabProps> = ({
 
   const handleResetDefault = () => {
     const defaultSettings: ColumnVisibilitySettings = {
-      showGajiPokok: true,
-      showTunjanganJabatan: true,
+      showGajiPokok: false,
+      showTunjanganJabatan: false,
     };
     onUpdateColumnSettings(defaultSettings);
     storageService.saveColumnSettings(defaultSettings);
@@ -191,7 +191,7 @@ export const PengaturanTab: React.FC<PengaturanTabProps> = ({
             <button
               onClick={handleResetDefault}
               className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 font-medium text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Kembalikan ke pengaturan default (keduanya tampil)"
+              title="Kembalikan ke pengaturan default (keduanya tidak aktif / disembunyikan)"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Reset Default

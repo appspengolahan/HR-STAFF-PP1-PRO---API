@@ -23,6 +23,7 @@ import {
   INITIAL_STAFF_LIST,
 } from '../data/initialData';
 import { getEffectiveFaktorPotongan } from './payrollEngine';
+import { formatWaktuWib } from '../utils/dateFormatter';
 
 export interface ColumnVisibilitySettings {
   showGajiPokok: boolean;
@@ -44,7 +45,7 @@ const KEYS = {
   GAS_CONFIG: 'bk_hr_gas_config_v3',
   THEME_MODE: 'bk_hr_theme_mode_v3',
   SIDEBAR_COLLAPSED: 'bk_hr_sidebar_collapsed_v3',
-  COLUMN_SETTINGS: 'bk_hr_column_settings_v3',
+  COLUMN_SETTINGS: 'bk_hr_column_settings_v4',
 };
 
 // Cleanup old obsolete v1 and v2 keys
@@ -437,7 +438,7 @@ export const storageService = {
       apiUrl: '',
       isAutoSync: false,
       status: 'idle',
-      lastSyncTimestamp: new Date().toLocaleTimeString('id-ID'),
+      lastSyncTimestamp: formatWaktuWib(new Date(), true),
     };
     const stored = readStorage<GasConfig>(KEYS.GAS_CONFIG, fallback);
     // Jika tersimpan URL lama HR Pekerja (AKfycbz... / spreadsheet 11NpDy...), bersihkan otomatis agar data tidak tertukar
@@ -475,8 +476,8 @@ export const storageService = {
   // Column Display Settings (Checklist Kolom Tampilan)
   getColumnSettings(): ColumnVisibilitySettings {
     const fallback: ColumnVisibilitySettings = {
-      showGajiPokok: true,
-      showTunjanganJabatan: true,
+      showGajiPokok: false,
+      showTunjanganJabatan: false,
     };
     return readStorage<ColumnVisibilitySettings>(KEYS.COLUMN_SETTINGS, fallback);
   },
