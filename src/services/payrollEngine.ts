@@ -212,11 +212,21 @@ export function getEffectiveFaktorPotongan(p: {
   jenisIjin?: string;
   faktorPotongan?: number;
   durasiMenit?: number;
+  jamAwal?: string;
+  jamAkhir?: string;
   lampiranSurat?: string;
   catatan?: string;
 }): number {
   const jenis = (p.jenisIjin || '').trim();
-  const durasi = Number(p.durasiMenit) || 0;
+  let durasi = Number(p.durasiMenit) || 0;
+  if ((!durasi || durasi <= 0) && p.jamAwal && p.jamAkhir) {
+    const [h1, m1] = p.jamAwal.split(':').map(Number);
+    const [h2, m2] = p.jamAkhir.split(':').map(Number);
+    if (!isNaN(h1) && !isNaN(m1) && !isNaN(h2) && !isNaN(m2)) {
+      const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+      if (diff > 0) durasi = diff;
+    }
+  }
   const lampiran = (p.lampiranSurat || '').trim().toLowerCase();
   const catatan = (p.catatan || '').trim().toLowerCase();
 

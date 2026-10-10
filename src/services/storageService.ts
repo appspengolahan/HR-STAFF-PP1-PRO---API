@@ -181,6 +181,53 @@ export const storageService = {
         manualList.unshift(dedikRec);
         writeStorage(KEYS.PRESENSI_MANUAL, manualList);
       }
+    } else {
+      // Perbarui jika data Dedik Anwar tanggal 2026-10-09 masih mencatat waktu lama (08:00 atau durasi 120 atau faktor 0)
+      let manualChanged = false;
+      manualList.forEach((m, idx) => {
+        if (
+          m.nip === 'BK-PP1-017' &&
+          (m.tanggal === '2026-10-09' || m.tanggal === '09/10/2026') &&
+          (m.jamAwal === '08:00' || m.durasiMenit === 120 || m.faktorPotongan === 0)
+        ) {
+          manualList[idx] = {
+            ...m,
+            jamAwal: '14:00',
+            jamAkhir: '16:30',
+            durasiMenit: 150,
+            jenisIjin: 'Ijin Pulang Awal',
+            faktorPotongan: 0.5,
+          };
+          manualChanged = true;
+        }
+      });
+      if (manualChanged) {
+        writeStorage(KEYS.PRESENSI_MANUAL, manualList);
+      }
+
+      if (list && Array.isArray(list)) {
+        let listChanged = false;
+        list.forEach((p, idx) => {
+          if (
+            p.nip === 'BK-PP1-017' &&
+            (p.tanggal === '2026-10-09' || p.tanggal === '09/10/2026') &&
+            (p.jamAwal === '08:00' || p.durasiMenit === 120 || p.faktorPotongan === 0)
+          ) {
+            list[idx] = {
+              ...p,
+              jamAwal: '14:00',
+              jamAkhir: '16:30',
+              durasiMenit: 150,
+              jenisIjin: 'Ijin Pulang Awal',
+              faktorPotongan: 0.5,
+            };
+            listChanged = true;
+          }
+        });
+        if (listChanged) {
+          writeStorage(KEYS.PRESENSI, list);
+        }
+      }
     }
 
     // Pastikan seluruh data input manual lokal selalu disertakan paling atas (tidak pernah hilang)

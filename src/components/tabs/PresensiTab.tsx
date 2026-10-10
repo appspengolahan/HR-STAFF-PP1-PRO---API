@@ -178,6 +178,49 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   const [editLampiranSurat, setEditLampiranSurat] = useState<'Ya' | 'Tidak'>('Tidak');
   const [editCatatan, setEditCatatan] = useState('');
 
+  // Helper hitung selisih jam ke durasi menit secara akurat
+  const calculateDurasiMenit = (awal: string, akhir: string): number => {
+    if (!awal || !akhir) return 0;
+    const [h1, m1] = awal.split(':').map(Number);
+    const [h2, m2] = akhir.split(':').map(Number);
+    if (isNaN(h1) || isNaN(m1) || isNaN(h2) || isNaN(m2)) return 0;
+    const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+    return diff > 0 ? diff : 0;
+  };
+
+  // Compute Faktor Potongan automatically
+  const computeFaktor = (jenis: string, durasiMenit: number, lampiran: string = 'Tidak'): number => {
+    const j = (jenis || '').trim();
+    if (
+      j === 'Hadir' ||
+      j === 'Sakit (S Dokter)' ||
+      lampiran === 'Ya' ||
+      j === 'Cuti' ||
+      j === 'Cuti Tahunan' ||
+      j === 'Ijin Normatif'
+    ) {
+      return 0;
+    }
+    if (
+      j === 'Sakit (S Tangan)' ||
+      j === 'Ijin (S Tangan)' ||
+      j === 'Alpha' ||
+      j === 'Ijin Tidak Masuk'
+    ) {
+      return 1;
+    }
+    if (
+      j === 'Ijin Terlambat' ||
+      j === 'Ijin Keluar Sementara' ||
+      j === 'Ijin Pulang Awal'
+    ) {
+      if (durasiMenit <= 120) return 0;
+      if (durasiMenit < 240) return 0.5;
+      return 1;
+    }
+    return 0;
+  };
+
   const handleOpenEditModal = (rec: PresensiRecord) => {
     setSelectedRecordForEdit(rec);
     const rawTgl = rec.tanggal;
@@ -193,8 +236,19 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
     setEditJenisIjin(rec.jenisIjin);
     setEditJamAwal(rec.jamAwal || '');
     setEditJamAkhir(rec.jamAkhir || '');
-    setEditDurasiMenit(rec.durasiMenit || 0);
-    setEditFaktorPotongan(rec.faktorPotongan || 0);
+
+    // Hitung durasi aktual otomatis dari jamAwal dan jamAkhir jika tersedia
+    let durasi = rec.durasiMenit || 0;
+    if (rec.jamAwal && rec.jamAkhir) {
+      const calculated = calculateDurasiMenit(rec.jamAwal, rec.jamAkhir);
+      if (calculated > 0) {
+        durasi = calculated;
+      }
+    }
+    setEditDurasiMenit(durasi);
+    setEditFaktorPotongan(
+      rec.faktorPotongan !== undefined ? rec.faktorPotongan : computeFaktor(rec.jenisIjin, durasi, rec.lampiranSurat)
+    );
     setEditKeperluan(rec.keperluan || '');
     setEditLampiranSurat(rec.lampiranSurat || 'Tidak');
     setEditCatatan(rec.catatan || '');
@@ -231,22 +285,6 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
       onUpdatePresensi(selectedRecordForEdit.id, updated);
     }
     setSelectedRecordForEdit(null);
-  };
-
-  // Compute Faktor Potongan automatically
-  const computeFaktor = (jenis: JenisIjin, durasiMenit: number): number => {
-    if (jenis === 'Hadir' || jenis === 'Sakit (S Dokter)' || jenis === 'Ijin Normatif') return 0;
-    if (jenis === 'Sakit (S Tangan)' || jenis === 'Ijin (S Tangan)' || jenis === 'Alpha') return 1;
-    if (
-      jenis === 'Ijin Terlambat' ||
-      jenis === 'Ijin Keluar Sementara' ||
-      jenis === 'Ijin Pulang Awal'
-    ) {
-      if (durasiMenit <= 120) return 0;
-      if (durasiMenit < 240) return 0.5;
-      return 1;
-    }
-    return 0;
   };
 
   // Helper to format date as DD/MM/YYYY
@@ -346,18 +384,20 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
             jamAwal = '08:00';
             jamAkhir = '13:00';
             durasi = 300;
+          } else if (hariStr === 'Jumat') {
+            jamAwal = '08:00';
+            jamAkhir = '16:30';
+            durasi = 420;
           } else {
             jamAwal = '08:00';
             jamAkhir = '16:00';
             durasi = 420;
           }
         } else {
-          const [h1, m1] = jamAwal.split(':').map(Number);
-          const [h2, m2] = jamAkhir.split(':').map(Number);
-          durasi = Math.max(0, (h2 * 60 + m2) - (h1 * 60 + m1));
+          durasi = calculateDurasiMenit(jamAwal, jamAkhir);
         }
 
-        const faktor = computeFaktor(formJenisIjin, durasi);
+        const faktor = computeFaktor(formJenisIjin, durasi, formLampiran);
 
         recordsToAdd.push({
           id: `pr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -896,26 +936,47 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
               </div>
 
               {!formSehariPenuh && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold mb-1">Jam Awal (Masuk/Ijin)</label>
-                    <input
-                      type="time"
-                      value={formJamAwal}
-                      onChange={(e) => setFormJamAwal(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg text-xs font-mono"
-                    />
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold mb-1">Jam Awal (Masuk/Ijin)</label>
+                      <input
+                        type="time"
+                        value={formJamAwal}
+                        onChange={(e) => setFormJamAwal(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1">Jam Akhir (Selesai/Kembali)</label>
+                      <input
+                        type="time"
+                        value={formJamAkhir}
+                        onChange={(e) => setFormJamAkhir(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg text-xs font-mono"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block font-semibold mb-1">Jam Akhir (Selesai/Kembali)</label>
-                    <input
-                      type="time"
-                      value={formJamAkhir}
-                      onChange={(e) => setFormJamAkhir(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg text-xs font-mono"
-                    />
-                  </div>
-                </div>
+
+                  {formJamAwal && formJamAkhir && (
+                    <div className="p-2.5 rounded-lg bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 flex items-center justify-between text-xs">
+                      <div className="text-slate-600 dark:text-slate-300">
+                        Durasi Terhitung Otomatis: <strong className="text-slate-900 dark:text-white font-mono">{calculateDurasiMenit(formJamAwal, formJamAkhir)} Menit</strong>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded font-bold text-[11px] font-mono ${
+                        computeFaktor(formJenisIjin, calculateDurasiMenit(formJamAwal, formJamAkhir), formLampiran) > 0
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
+                          : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
+                      }`}>
+                        Faktor Potongan: {computeFaktor(formJenisIjin, calculateDurasiMenit(formJamAwal, formJamAkhir), formLampiran) === 0
+                          ? '0 (Dibayar Penuh)'
+                          : computeFaktor(formJenisIjin, calculateDurasiMenit(formJamAwal, formJamAkhir), formLampiran) === 0.5
+                          ? '0,5 (Potong Setengah Hari)'
+                          : '1,0 (Hangus 1 Hari)'}
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
 
               <div>
@@ -1040,7 +1101,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                     onChange={(e) => {
                       const j = e.target.value as JenisIjin;
                       setEditJenisIjin(j);
-                      setEditFaktorPotongan(computeFaktor(j, editDurasiMenit));
+                      setEditFaktorPotongan(computeFaktor(j, editDurasiMenit, editLampiranSurat));
                     }}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold text-blue-600 dark:text-blue-400"
                   >
@@ -1076,7 +1137,20 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                   <input
                     type="time"
                     value={editJamAwal}
-                    onChange={(e) => setEditJamAwal(e.target.value)}
+                    onChange={(e) => {
+                      const newAwal = e.target.value;
+                      setEditJamAwal(newAwal);
+                      if (newAwal && editJamAkhir) {
+                        const dur = calculateDurasiMenit(newAwal, editJamAkhir);
+                        setEditDurasiMenit(dur);
+                        let j = editJenisIjin;
+                        if (newAwal >= '12:00' && (editJamAkhir >= '16:00') && j === 'Ijin Terlambat') {
+                          j = 'Ijin Pulang Awal';
+                          setEditJenisIjin(j);
+                        }
+                        setEditFaktorPotongan(computeFaktor(j, dur, editLampiranSurat));
+                      }
+                    }}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono"
                   />
                 </div>
@@ -1087,7 +1161,20 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                   <input
                     type="time"
                     value={editJamAkhir}
-                    onChange={(e) => setEditJamAkhir(e.target.value)}
+                    onChange={(e) => {
+                      const newAkhir = e.target.value;
+                      setEditJamAkhir(newAkhir);
+                      if (editJamAwal && newAkhir) {
+                        const dur = calculateDurasiMenit(editJamAwal, newAkhir);
+                        setEditDurasiMenit(dur);
+                        let j = editJenisIjin;
+                        if (editJamAwal >= '12:00' && (newAkhir >= '16:00') && j === 'Ijin Terlambat') {
+                          j = 'Ijin Pulang Awal';
+                          setEditJenisIjin(j);
+                        }
+                        setEditFaktorPotongan(computeFaktor(j, dur, editLampiranSurat));
+                      }
+                    }}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono"
                   />
                 </div>
@@ -1101,11 +1188,25 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                     onChange={(e) => {
                       const val = Number(e.target.value) || 0;
                       setEditDurasiMenit(val);
-                      setEditFaktorPotongan(computeFaktor(editJenisIjin, val));
+                      setEditFaktorPotongan(computeFaktor(editJenisIjin, val, editLampiranSurat));
                     }}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono"
                   />
                 </div>
+              </div>
+
+              {/* Informative Auto-calculation banner in edit modal */}
+              <div className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 text-xs flex items-center justify-between">
+                <span className="text-slate-600 dark:text-slate-300">
+                  Perhitungan Otomatis: <strong className="font-mono text-slate-900 dark:text-white">{editDurasiMenit} Menit</strong>
+                </span>
+                <span className={`px-2.5 py-0.5 rounded font-bold text-[11px] font-mono ${
+                  editFaktorPotongan > 0
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
+                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
+                }`}>
+                  Faktor: {editFaktorPotongan === 0 ? '0 (Dibayar Penuh)' : editFaktorPotongan === 0.5 ? '0,5 (Setengah Hari)' : '1,0 (Hangus 1 Hari)'}
+                </span>
               </div>
 
               <div>
@@ -1129,7 +1230,11 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                   </label>
                   <select
                     value={editLampiranSurat}
-                    onChange={(e) => setEditLampiranSurat(e.target.value as any)}
+                    onChange={(e) => {
+                      const l = e.target.value as 'Ya' | 'Tidak';
+                      setEditLampiranSurat(l);
+                      setEditFaktorPotongan(computeFaktor(editJenisIjin, editDurasiMenit, l));
+                    }}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
                   >
                     <option value="Tidak">Tidak Ada Lampiran</option>
