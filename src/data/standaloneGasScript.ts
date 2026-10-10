@@ -266,6 +266,150 @@ function doPost(e) {
       return jsonResponse_({ status: "success", message: "Lembur tersimpan di GAS V3 Standalone" });
     }
 
+    // UPDATE PRESENSI & IJIN (2-Arah)
+    if (action === "update_presensi") {
+      const sh = ss.getSheetByName(SHEET_NAMES.PRESENSI);
+      if (!sh) throw new Error("Sheet LOG_PRESENSI_IJIN tidak ditemukan");
+      const rec = payload.record;
+      const targetRowNum = Number(payload.rowNum || rec.rowNum || 0);
+      const values = sh.getDataRange().getValues();
+      let foundRow = -1;
+
+      // 1. Coba cari dengan rowNum jika valid
+      if (targetRowNum >= 6 && targetRowNum <= values.length) {
+        const check = values[targetRowNum - 1];
+        if (check && String(check[3]).trim().toLowerCase() === String(rec.nama || '').trim().toLowerCase()) {
+          foundRow = targetRowNum;
+        }
+      }
+
+      // 2. Jika tidak cocok via rowNum, cari berdasarkan tanggal & nama
+      if (foundRow === -1) {
+        for (let r = values.length - 1; r >= 5; r--) {
+          const row = values[r];
+          const rowTgl = row[2] instanceof Date ? Utilities.formatDate(row[2], Session.getScriptTimeZone(), "yyyy-MM-dd") : String(row[2] || '');
+          const rowNama = String(row[3] || '').trim().toLowerCase();
+          const targetNama = String(rec.nama || '').trim().toLowerCase();
+          const targetTgl = String(rec.tanggal || '').replace(/\\//g, '-');
+          if (rowNama === targetNama && (rowTgl === targetTgl || rowTgl.includes(targetTgl) || targetTgl.includes(rowTgl))) {
+            foundRow = r + 1;
+            break;
+          }
+        }
+      }
+
+      if (foundRow === -1) {
+        return jsonResponse_({ status: "error", message: "Baris data presensi tidak ditemukan di Spreadsheet untuk di-update" });
+      }
+
+      // Perbarui kolom baris yang ditemukan: C (tanggal) sampai Q (faktorPotongan)
+      if (rec.tanggal !== undefined) sh.getRange(foundRow, 3).setValue(rec.tanggal);
+      if (rec.nama !== undefined) sh.getRange(foundRow, 4).setValue(rec.nama);
+      if (rec.jabatan !== undefined) sh.getRange(foundRow, 5).setValue(rec.jabatan);
+      if (rec.sekup !== undefined) sh.getRange(foundRow, 6).setValue(rec.sekup);
+      if (rec.jamAwal !== undefined) sh.getRange(foundRow, 7).setValue(rec.jamAwal);
+      if (rec.jamAkhir !== undefined) sh.getRange(foundRow, 8).setValue(rec.jamAkhir);
+      if (rec.durasiMenit !== undefined) sh.getRange(foundRow, 9).setValue(Number(rec.durasiMenit) || 0);
+      if (rec.jenisIjin !== undefined) sh.getRange(foundRow, 10).setValue(rec.jenisIjin);
+      if (rec.keperluan !== undefined) sh.getRange(foundRow, 11).setValue(rec.keperluan);
+      if (rec.lampiranSurat !== undefined) sh.getRange(foundRow, 12).setValue(rec.lampiranSurat);
+      if (rec.catatan !== undefined) sh.getRange(foundRow, 13).setValue(rec.catatan);
+      if (rec.bulan !== undefined) sh.getRange(foundRow, 15).setValue(Number(rec.bulan) || 10);
+      if (rec.tahun !== undefined) sh.getRange(foundRow, 16).setValue(Number(rec.tahun) || 2026);
+      if (rec.faktorPotongan !== undefined) sh.getRange(foundRow, 17).setValue(Number(rec.faktorPotongan) || 0);
+
+      return jsonResponse_({
+        status: "success",
+        message: "Berhasil memperbarui data presensi baris " + foundRow + " di Spreadsheet",
+        updatedRow: foundRow
+      });
+    }
+
+    // HAPUS PRESENSI & IJIN (2-Arah)
+    if (action === "delete_presensi") {
+      const sh = ss.getSheetByName(SHEET_NAMES.PRESENSI);
+      if (!sh) throw new Error("Sheet LOG_PRESENSI_IJIN tidak ditemukan");
+      const rec = payload.record || {};
+      const targetRowNum = Number(payload.rowNum || rec.rowNum || 0);
+      const values = sh.getDataRange().getValues();
+      let foundRow = -1;
+
+      // 1. Coba cari dengan rowNum jika ada
+      if (targetRowNum >= 6 && targetRowNum <= values.length) {
+        const check = values[targetRowNum - 1];
+        if (check && (!rec.nama || String(check[3]).trim().toLowerCase() === String(rec.nama).trim().toLowerCase())) {
+          foundRow = targetRowNum;
+        }
+      }
+
+      // 2. Cari dari baris terbawah berdasarkan tanggal & nama
+      if (foundRow === -1) {
+        for (let r = values.length - 1; r >= 5; r--) {
+          const row = values[r];
+          const rowTgl = row[2] instanceof Date ? Utilities.formatDate(row[2], Session.getScriptTimeZone(), "yyyy-MM-dd") : String(row[2] || '');
+          const rowNama = String(row[3] || '').trim().toLowerCase();
+          const targetNama = String(rec.nama || '').trim().toLowerCase();
+          const targetTgl = String(rec.tanggal || '').replace(/\\//g, '-');
+          if (rowNama === targetNama && (rowTgl === targetTgl || rowTgl.includes(targetTgl) || targetTgl.includes(rowTgl))) {
+            foundRow = r + 1;
+            break;
+          }
+        }
+      }
+
+      if (foundRow === -1) {
+        return jsonResponse_({
+          status: "warning",
+          message: "Baris data presensi tidak ditemukan di Spreadsheet (mungkin sudah terhapus)"
+        });
+      }
+
+      // Hapus baris dari Spreadsheet
+      sh.deleteRow(foundRow);
+
+      return jsonResponse_({
+        status: "success",
+        message: "Berhasil menghapus baris " + foundRow + " dari sheet LOG_PRESENSI_IJIN Spreadsheet",
+        deletedRow: foundRow
+      });
+    }
+
+    // HAPUS STAF DARI MASTER_STAFF (2-Arah)
+    if (action === "delete_staff") {
+      const sh = ss.getSheetByName(SHEET_NAMES.MASTER);
+      if (!sh) throw new Error("Sheet MASTER_STAFF tidak ditemukan");
+      const targetNip = String(payload.nip || '').trim().toLowerCase();
+      const targetNama = String(payload.nama || '').trim().toLowerCase();
+      const values = sh.getDataRange().getValues();
+      let foundRow = -1;
+
+      for (let r = 5; r < values.length; r++) {
+        const row = values[r];
+        const rowNama = String(row[2] || '').trim().toLowerCase();
+        const rowNip = String(row[3] || '').trim().toLowerCase();
+        if ((targetNip && rowNip === targetNip) || (targetNama && rowNama === targetNama)) {
+          foundRow = r + 1;
+          break;
+        }
+      }
+
+      if (foundRow === -1) {
+        return jsonResponse_({
+          status: "warning",
+          message: "Staf " + (payload.nama || payload.nip) + " tidak ditemukan di MASTER_STAFF"
+        });
+      }
+
+      // Hapus baris staf
+      sh.deleteRow(foundRow);
+
+      return jsonResponse_({
+        status: "success",
+        message: "Berhasil menghapus staf baris " + foundRow + " dari MASTER_STAFF Spreadsheet",
+        deletedRow: foundRow
+      });
+    }
+
     return jsonResponse_({ status: "success", message: "Payload diterima", action: action });
   } catch (err) {
     return jsonResponse_({ status: "error", message: err.toString() });

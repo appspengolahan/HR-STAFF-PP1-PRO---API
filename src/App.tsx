@@ -406,9 +406,18 @@ export default function App() {
   };
 
   const handleDeleteStaff = (nip: string) => {
+    const staffTarget = staffList.find((s) => s.nip === nip);
     const success = storageService.deleteStaff(nip, currentUser?.nama || 'Admin');
     if (success) {
       setStaffList(storageService.getStaffList());
+
+      // Sinkronisasi hapus 2-arah ke Spreadsheet jika GAS terhubung
+      const cfg = storageService.getGasConfig();
+      if (cfg.apiUrl && staffTarget) {
+        gasClient.deleteStaff(cfg.apiUrl, { nip: staffTarget.nip, nama: staffTarget.nama }).catch((e) =>
+          console.warn('Gagal sinkronisasi hapus staf ke Spreadsheet:', e)
+        );
+      }
     }
   };
 
@@ -436,13 +445,37 @@ export default function App() {
   };
 
   const handleDeletePresensi = (id: string) => {
+    const targetRec = presensiList.find((p) => p.id === id);
     storageService.deletePresensi(id, currentUser?.nama || 'Admin');
     setPresensiList(storageService.getPresensiList());
+
+    // Sinkronisasi hapus 2-arah ke Spreadsheet jika GAS terhubung
+    const cfg = storageService.getGasConfig();
+    if (cfg.apiUrl && targetRec) {
+      gasClient
+        .deletePresensi(cfg.apiUrl, {
+          id: targetRec.id,
+          rowNum: targetRec.rowNum,
+          nama: targetRec.nama,
+          tanggal: targetRec.tanggal,
+        })
+        .catch((e) => console.warn('Gagal sinkronisasi hapus presensi ke Spreadsheet:', e));
+    }
   };
 
   const handleUpdatePresensi = (id: string, updatedRec: Partial<PresensiRecord>) => {
+    const existingRec = presensiList.find((p) => p.id === id);
     storageService.updatePresensi(id, updatedRec);
     setPresensiList(storageService.getPresensiList());
+
+    // Sinkronisasi update 2-arah ke Spreadsheet jika GAS terhubung
+    const cfg = storageService.getGasConfig();
+    if (cfg.apiUrl) {
+      const mergedRec = { ...existingRec, ...updatedRec };
+      gasClient
+        .updatePresensi(cfg.apiUrl, mergedRec, existingRec?.rowNum)
+        .catch((e) => console.warn('Gagal sinkronisasi update presensi ke Spreadsheet:', e));
+    }
   };
 
   // Handlers for Lembur

@@ -186,6 +186,36 @@ export const gasClient = {
     return (await res.json()) as GasResponse;
   },
 
+  async updatePresensi(apiUrl: string, record: Partial<PresensiRecord>, rowNum?: number): Promise<GasResponse> {
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'update_presensi', record, rowNum }),
+    });
+    if (!res.ok) throw new Error(`Gagal mengupdate presensi di spreadsheet: ${res.statusText}`);
+    return (await res.json()) as GasResponse;
+  },
+
+  async deletePresensi(apiUrl: string, record: { id?: string; rowNum?: number; nama?: string; tanggal?: string }): Promise<GasResponse> {
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'delete_presensi', record, rowNum: record.rowNum }),
+    });
+    if (!res.ok) throw new Error(`Gagal menghapus presensi di spreadsheet: ${res.statusText}`);
+    return (await res.json()) as GasResponse;
+  },
+
+  async deleteStaff(apiUrl: string, staff: { nip: string; nama?: string }): Promise<GasResponse> {
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'delete_staff', nip: staff.nip, nama: staff.nama }),
+    });
+    if (!res.ok) throw new Error(`Gagal menghapus staf di spreadsheet: ${res.statusText}`);
+    return (await res.json()) as GasResponse;
+  },
+
   async pushLembur(apiUrl: string, record: LemburRecord): Promise<GasResponse> {
     const res = await fetch(apiUrl, {
       method: 'POST',

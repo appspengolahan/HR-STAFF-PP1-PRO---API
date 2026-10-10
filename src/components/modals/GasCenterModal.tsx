@@ -184,7 +184,7 @@ export const GasCenterModal: React.FC<GasCenterModalProps> = ({
             }`}
           >
             <Terminal className="w-3.5 h-3.5" />
-            Kode Standalone GAS V2 (Siap Copy)
+            Kode Standalone GAS V3.1 (Sinkronisasi 2-Arah)
           </button>
         </div>
 
@@ -194,7 +194,7 @@ export const GasCenterModal: React.FC<GasCenterModalProps> = ({
             <>
               <div className="p-3.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-xl text-blue-900 dark:text-blue-300 leading-relaxed">
                 <p>
-                  <strong>Strategi Deployment Paralel (Shadow Run):</strong> GAS baru ini berjalan mandiri tanpa mengganggu GAS lama yang sudah aktif di spreadsheet. Data baru bisa diverifikasi secara berdampingan sampai akurasi terbukti 100% valid.
+                  <strong>Sinkronisasi 2-Arah Aktif:</strong> Setiap input data baru, pengeditan catatan ijin, dan penghapusan data di Web Apps akan otomatis tersinkronisasi langsung ke baris Google Spreadsheet yang bersangkutan jika URL Web App GAS di bawah ini telah terhubung.
                 </p>
               </div>
 
