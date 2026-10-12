@@ -13,6 +13,7 @@ import {
 import { LemburRecord, StaffData } from '../../types';
 import { formatRupiah, NAMA_BULAN_INDO } from '../../services/payrollEngine';
 import { formatTanggalDmy } from '../../utils/dateFormatter';
+import { appAlert } from '../../services/dialogService';
 
 interface LemburTabProps {
   lemburList: LemburRecord[];
@@ -103,7 +104,7 @@ export const LemburTab: React.FC<LemburTabProps> = ({
   const handleSubmitLembur = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedStaffNips.length === 0) {
-      alert('Pilih minimal 1 orang staf yang mengikuti lembur.');
+      appAlert('Pilih minimal 1 orang staf yang mengikuti lembur.');
       return;
     }
 

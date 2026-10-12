@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { CutiRecord, StaffData, AuthUser } from '../../types';
 import { formatTanggalDmy } from '../../utils/dateFormatter';
+import { appAlert } from '../../services/dialogService';
 
 interface CutiIjinTabProps {
   cutiList: CutiRecord[];
@@ -52,7 +53,7 @@ export const CutiIjinTab: React.FC<CutiIjinTabProps> = ({
     e.preventDefault();
     const st = staffList.find((s) => s.nip === formStaffNip);
     if (!st) {
-      alert('Pilih karyawan terlebih dahulu.');
+      appAlert('Pilih karyawan terlebih dahulu.');
       return;
     }
 

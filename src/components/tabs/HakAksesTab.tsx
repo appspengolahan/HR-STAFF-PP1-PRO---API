@@ -14,6 +14,7 @@ import {
 import { AuthUser, DeletedArchiveRecord, UserRole } from '../../types';
 import { storageService } from '../../services/storageService';
 import { formatTanggalWaktuIndo } from '../../utils/dateFormatter';
+import { appConfirm } from '../../services/dialogService';
 
 interface HakAksesTabProps {
   currentUser: AuthUser | null;
@@ -177,12 +178,19 @@ export const HakAksesTab: React.FC<HakAksesTabProps> = ({
             </div>
 
             <button
-              onClick={() => {
-                if (confirm('YAKIN INGIN MERESET SELURUH DATA KE DEFAULT PABRIK? Tindakan ini tidak dapat dibatalkan.')) {
+              onClick={async () => {
+                const ok = await appConfirm(
+                  'YAKIN INGIN MERESET SELURUH DATA KE DEFAULT PABRIK? Tindakan ini tidak dapat dibatalkan.',
+                  {
+                    isDestructive: true,
+                    confirmText: 'Reset Pabrik',
+                  }
+                );
+                if (ok) {
                   onResetData();
                 }
               }}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm shrink-0"
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm shrink-0 cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
               Reset Database Lokal

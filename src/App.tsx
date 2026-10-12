@@ -31,6 +31,8 @@ import { LoginGateModal } from './components/LoginGateModal';
 import { HelpModal } from './components/modals/HelpModal';
 import { SwitchBoardModal } from './components/modals/SwitchBoardModal';
 import { GasCenterModal } from './components/modals/GasCenterModal';
+import { AppDialogModal } from './components/modals/AppDialogModal';
+import { appAlert } from './services/dialogService';
 
 // Tabs
 import { DashboardTab } from './components/tabs/DashboardTab';
@@ -287,9 +289,9 @@ export default function App() {
       storageService.saveStaffList(updatedStaff);
       setMutasiList(updatedMutasi);
       setStaffList(updatedStaff);
-      alert(`${appliedCount} mutasi terjadwal yang sudah jatuh tempo berhasil diterapkan ke database.`);
+      appAlert(`${appliedCount} mutasi terjadwal yang sudah jatuh tempo berhasil diterapkan ke database.`);
     } else {
-      alert('Tidak ada mutasi terjadwal yang jatuh tempo hari ini.');
+      appAlert('Tidak ada mutasi terjadwal yang jatuh tempo hari ini.');
     }
   };
 
@@ -542,7 +544,7 @@ export default function App() {
     storageService.saveCalonList(updated);
     setCalonList(updated);
     setStaffList(storageService.getStaffList());
-    alert(`${newStaff.nama} berhasil dinyatakan LOLOS dan masuk ke Database Karyawan (NIP: ${newStaff.nip}).`);
+    appAlert(`${newStaff.nama} berhasil dinyatakan LOLOS dan masuk ke Database Karyawan (NIP: ${newStaff.nip}).`);
   };
 
   const handleExtendCalon = (calonId: string, newEndDate: string, reason: string) => {
@@ -906,6 +908,9 @@ export default function App() {
 
       {/* Offline Status Toast */}
       <OfflineIndicator />
+
+      {/* Global Centered Dialog & Confirmation Modal ("hr staff pp1 says") */}
+      <AppDialogModal />
 
       {/* GAS Live Sync Toast Notification */}
       {syncToastMessage && (

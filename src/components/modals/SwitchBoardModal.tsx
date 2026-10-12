@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Search, ExternalLink, CheckCircle, Layers } from 'lucide-react';
+import { appAlert } from '../../services/dialogService';
 
 interface SwitchBoardModalProps {
   isOpen: boolean;
@@ -231,7 +232,7 @@ export const SwitchBoardModal: React.FC<SwitchBoardModalProps> = ({ isOpen, onCl
                 ) : (
                   <button
                     onClick={() => {
-                      alert(`Modul "${app.nama}" terdaftar dalam Workspace OS PT Batu Karang.`);
+                      appAlert(`Modul "${app.nama}" terdaftar dalam Workspace OS PT Batu Karang.`);
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors"
                   >

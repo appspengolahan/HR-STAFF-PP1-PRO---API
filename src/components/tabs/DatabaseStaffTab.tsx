@@ -20,6 +20,7 @@ import { PkwtAlertCard, parsePkwtDate } from '../PkwtAlertCard';
 import { formatTanggalIndo } from '../../utils/dateFormatter';
 import { storageService, ColumnVisibilitySettings } from '../../services/storageService';
 import { ColumnSettingsModal } from '../modals/ColumnSettingsModal';
+import { appConfirm } from '../../services/dialogService';
 
 interface DatabaseStaffTabProps {
   staffList: StaffData[];
@@ -490,13 +491,20 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                           Mutasi
                         </button>
                         <button
-                          onClick={() => {
-                            if (confirm(`Yakin ingin menghapus ${st.nama} (${st.nip})? Data akan diarsipkan.`)) {
+                          onClick={async () => {
+                            const ok = await appConfirm(
+                              `Yakin ingin menghapus ${st.nama} (${st.nip})? Data akan diarsipkan.`,
+                              {
+                                isDestructive: true,
+                                confirmText: 'Hapus & Arsipkan',
+                              }
+                            );
+                            if (ok) {
                               onDeleteStaff(st.nip);
                             }
                           }}
                           title="Hapus / Nonaktifkan"
-                          className="p-1 text-slate-400 hover:text-red-500 rounded"
+                          className="p-1 text-slate-400 hover:text-red-500 rounded cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

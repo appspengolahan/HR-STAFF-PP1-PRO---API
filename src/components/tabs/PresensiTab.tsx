@@ -24,6 +24,7 @@ import { SuratIjinModal } from '../modals/SuratIjinModal';
 import { getNamaHariIndo, formatTanggalDmy, getTodayIsoDate } from '../../utils/dateFormatter';
 import { storageService, DEFAULT_GAS_API_URL } from '../../services/storageService';
 import { gasClient } from '../../services/gasClient';
+import { appConfirm, appAlert } from '../../services/dialogService';
 
 interface PresensiTabProps {
   presensiList: PresensiRecord[];
@@ -96,7 +97,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
       const cfg = storageService.getGasConfig();
       const activeUrl = cfg.apiUrl || DEFAULT_GAS_API_URL;
       if (!activeUrl) {
-        alert('URL Google Apps Script belum disetel.');
+        await appAlert('URL Google Apps Script belum disetel.');
         return;
       }
       const staff = staffList.find(
@@ -113,7 +114,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
         await onSyncPresensi();
       }
     } catch (err) {
-      alert(`Gagal mengirim ke Spreadsheet: ${err}`);
+      await appAlert(`Gagal mengirim ke Spreadsheet: ${err}`);
     } finally {
       setIsPushingRecordId(null);
     }
@@ -121,7 +122,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
 
   const handlePushAllUnsynced = async () => {
     if (unsyncedRecords.length === 0) {
-      alert('Semua data presensi sudah tersinkronisasi dengan Spreadsheet.');
+      await appAlert('Semua data presensi sudah tersinkronisasi dengan Spreadsheet.');
       return;
     }
     setIsPushingAll(true);
@@ -129,7 +130,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
       const cfg = storageService.getGasConfig();
       const activeUrl = cfg.apiUrl || DEFAULT_GAS_API_URL;
       if (!activeUrl) {
-        alert('URL Google Apps Script belum disetel.');
+        await appAlert('URL Google Apps Script belum disetel.');
         return;
       }
       let successCount = 0;
@@ -154,7 +155,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
         await onSyncPresensi();
       }
     } catch (err) {
-      alert(`Terjadi kesalahan saat sync data lokal: ${err}`);
+      await appAlert(`Terjadi kesalahan saat sync data lokal: ${err}`);
     } finally {
       setIsPushingAll(false);
     }
@@ -868,12 +869,20 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                           </button>
                           {!isStaffPortal && (
                             <button
-                              onClick={() => {
-                                if (confirm(`Hapus catatan ijin ${row.nama} tanggal ${row.tanggal}?`)) {
+                              onClick={async () => {
+                                const ok = await appConfirm(
+                                  `Hapus catatan ijin ${row.nama} tanggal ${row.tanggal}?`,
+                                  {
+                                    isDestructive: true,
+                                    confirmText: 'Hapus Catatan',
+                                  }
+                                );
+                                if (ok) {
                                   onDeletePresensi(row.id);
                                 }
                               }}
-                              className="p-1 text-slate-400 hover:text-red-500 rounded"
+                              className="p-1 text-slate-400 hover:text-red-500 rounded cursor-pointer"
+                              title="Hapus Catatan"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
