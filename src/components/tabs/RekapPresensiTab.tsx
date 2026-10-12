@@ -385,7 +385,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
       {/* ============================================================== */}
       {/* FILTER CONTROLS & PRINT ACTION (NO PRINT)                      */}
       {/* ============================================================== */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs no-print">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs no-print print:hidden">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
             <div>
@@ -632,7 +632,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
           </div>
 
           {/* Metric Toggle (Hidden in print) */}
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print print:hidden">
             <button
               onClick={() => setTrendMetric('kehadiran')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
@@ -847,7 +847,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
           </div>
 
           {/* Search, Filter Unit & Sort (no-print) */}
-          <div className="flex flex-wrap items-center gap-2 no-print">
+          <div className="flex flex-wrap items-center gap-2 no-print print:hidden">
             {/* Search Box */}
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -1054,7 +1054,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
               Rincian menit izin yang terakumulasi per bulan untuk masing-masing staf pada periode {periodeLabel}
             </p>
           </div>
-          <div className="flex items-center gap-2 no-print">
+          <div className="flex items-center gap-2 no-print print:hidden">
             <button
               type="button"
               onClick={() => setTableShowAllMonths(!tableShowAllMonths)}

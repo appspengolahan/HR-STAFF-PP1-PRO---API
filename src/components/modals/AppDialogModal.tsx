@@ -63,7 +63,7 @@ export const AppDialogModal: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="app-dialog-title"
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200 no-print print:hidden"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           handleCancel();

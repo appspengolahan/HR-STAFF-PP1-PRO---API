@@ -22,7 +22,7 @@ export const OfflineIndicator: React.FC = () => {
   if (isOnline) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 sm:bottom-4 sm:left-4 z-50 flex items-center gap-2 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xl border border-amber-400/40 animate-bounce">
+    <div className="fixed bottom-20 left-4 sm:bottom-4 sm:left-4 z-50 flex items-center gap-2 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xl border border-amber-400/40 animate-bounce no-print print:hidden">
       <WifiOff className="w-4 h-4 shrink-0" />
       <span>Mode Offline — Menggunakan Data Tersimpan</span>
     </div>

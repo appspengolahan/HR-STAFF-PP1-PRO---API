@@ -53,7 +53,7 @@ export const JadwalMutasiTab: React.FC<JadwalMutasiTabProps> = ({
       {/* Main Card */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
         {/* Controls */}
-        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 no-print bg-slate-50/50 dark:bg-slate-950/30">
+        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 no-print print:hidden bg-slate-50/50 dark:bg-slate-950/30">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-500">Filter Status:</span>
             {['Semua', 'Terjadwal', 'Diterapkan', 'Dibatalkan'].map((st) => (
@@ -102,7 +102,7 @@ export const JadwalMutasiTab: React.FC<JadwalMutasiTabProps> = ({
                 <th className="py-3 px-4">Keterangan</th>
                 <th className="py-3 px-4">Diinput Oleh</th>
                 <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-right no-print">Aksi</th>
+                <th className="py-3 px-4 text-right no-print print:hidden">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -146,7 +146,7 @@ export const JadwalMutasiTab: React.FC<JadwalMutasiTabProps> = ({
                         {item.status}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right no-print">
+                    <td className="py-3 px-4 text-right no-print print:hidden">
                       {item.status === 'Terjadwal' ? (
                         <div className="flex items-center justify-end gap-1.5">
                           <button

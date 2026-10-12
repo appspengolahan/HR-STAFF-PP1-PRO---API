@@ -73,10 +73,10 @@ _Dokumen digital resmi Divisi Produksi I - All Rights Reserved._`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200 print:static print:p-0 print:bg-transparent">
+      <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden print:border-none print:shadow-none print:max-h-none print:w-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 no-print">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 no-print print:hidden">
           <div>
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">
               Cetak Thermal POS &amp; Kirim WhatsApp
@@ -201,7 +201,7 @@ _Dokumen digital resmi Divisi Produksi I - All Rights Reserved._`;
           </div>
 
           {/* WhatsApp Text Card */}
-          <div className="w-full md:w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm space-y-3 no-print">
+          <div className="w-full md:w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm space-y-3 no-print print:hidden">
             <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
               <MessageSquare className="w-4 h-4" />
               Rangkuman Format WhatsApp

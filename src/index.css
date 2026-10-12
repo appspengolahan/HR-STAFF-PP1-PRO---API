@@ -6,40 +6,110 @@
   }
 }
 
-/* Print Rules */
+/* ========================================================================== */
+/* Print Rules & PDF Export Clean Output                                     */
+/* ========================================================================== */
 @page {
-  margin: 12mm 10mm;
+  margin: 10mm 10mm;
+  size: auto;
 }
 
 @media print {
-  .no-print {
-    display: none !important;
+  /* 1. Global Reset to eliminate browser default margins and side offsets */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
+  html,
   body {
     background: #ffffff !important;
     color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    overflow: visible !important;
   }
 
-  /* Force print paper background */
+  /* 2. COMPLETELY HIDE all Navigation, Sidebars, Headers, Toolbars, Buttons & Controls */
+  .no-print,
+  [data-no-print],
+  aside,
+  header,
+  nav,
+  button,
+  select,
+  input,
+  [role="button"],
+  [role="navigation"],
+  footer {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+  }
+
+  /* Hide table action columns (Aksi / Tindakan) */
+  th.no-print,
+  td.no-print {
+    display: none !important;
+  }
+
+  /* 3. Neutralize layout containers (Remove sidebar offsets like lg:ml-64, pt-14, pb-24) */
+  #root,
+  #root > div,
+  div[class*="lg:ml-"],
+  div[class*="pt-"],
+  div[class*="pb-"],
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* 4. Document / Print Paper Specific Styling */
   #surat-ijin-print-paper,
   #slip-gaji-a4-sheet,
   #thermal-slip-paper {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: static !important;
+    margin: 0 auto !important;
     box-shadow: none !important;
     border: 1px solid #000000 !important;
     page-break-inside: avoid;
     break-inside: avoid;
   }
 
-  aside,
-  header,
-  nav,
-  button {
+  /* When printing physical modal documents, hide background application */
+  body:has(#surat-ijin-print-paper) main,
+  body:has(#thermal-slip-paper) main {
     display: none !important;
   }
 
-  main {
-    margin: 0 !important;
+  body:has(#surat-ijin-print-paper) .fixed,
+  body:has(#thermal-slip-paper) .fixed {
+    position: static !important;
+    background: transparent !important;
     padding: 0 !important;
+  }
+
+  /* Ensure tables span full width cleanly on printed paper */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
   }
 }

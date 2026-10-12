@@ -79,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         isDevSupervisorVisible ? 'top-[88px] h-[calc(100vh-88px)]' : 'top-14 h-[calc(100vh-56px)]'
       } left-0 z-20 hidden lg:flex flex-col bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 select-none ${
         collapsed ? 'w-[68px]' : 'w-64'
-      }`}
+      } no-print print:hidden`}
     >
       {/* Top Header Controls: Mini Sidebar Mode Toggle di Bagian Atas */}
       <div className="p-2 border-b border-slate-800/90 bg-slate-950/60 flex items-center justify-center shrink-0">

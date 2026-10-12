@@ -781,7 +781,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                 <th className="py-3 px-4">Jam &amp; Durasi</th>
                 <th className="py-3 px-4">Faktor Potongan</th>
                 <th className="py-3 px-4">Keperluan</th>
-                <th className="py-3 px-4 text-right no-print">Aksi</th>
+                <th className="py-3 px-4 text-right no-print print:hidden">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -838,7 +838,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                       <td className="py-3 px-4 text-slate-600 dark:text-slate-300 max-w-xs truncate">
                         {row.keperluan || '-'}
                       </td>
-                      <td className="py-3 px-4 text-right no-print">
+                      <td className="py-3 px-4 text-right no-print print:hidden">
                         <div className="flex items-center justify-end gap-1.5">
                           {!row.rowNum && (
                             <button

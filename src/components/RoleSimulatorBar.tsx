@@ -28,7 +28,7 @@ export const RoleSimulatorBar: React.FC<RoleSimulatorBarProps> = ({
   if (!isVisible || !currentUser) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-slate-950/95 text-white border-b border-indigo-500/40 px-3 py-1.5 backdrop-blur-md shadow-2xl flex flex-wrap items-center justify-between gap-2 text-xs">
+    <div className="fixed top-0 left-0 right-0 z-50 bg-slate-950/95 text-white border-b border-indigo-500/40 px-3 py-1.5 backdrop-blur-md shadow-2xl flex flex-wrap items-center justify-between gap-2 text-xs no-print print:hidden">
       <div className="flex items-center gap-2">
         <span className="flex items-center gap-1 font-mono uppercase text-[10px] tracking-wider px-2 py-0.5 rounded bg-indigo-900/60 border border-indigo-400/40 text-indigo-300 font-bold">
           <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />

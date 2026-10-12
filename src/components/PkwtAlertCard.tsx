@@ -136,7 +136,7 @@ export const PkwtAlertCard: React.FC<PkwtAlertCardProps> = ({
               <th className="py-3 px-4 font-bold">Jabatan</th>
               <th className="py-3 px-4 font-bold text-center">Akhir PKWT</th>
               <th className="py-3 px-4 font-bold text-center">Sisa Hari</th>
-              {onActionClick && <th className="py-3 px-4 font-bold text-right no-print">Tindakan</th>}
+              {onActionClick && <th className="py-3 px-4 font-bold text-right no-print print:hidden">Tindakan</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
@@ -175,7 +175,7 @@ export const PkwtAlertCard: React.FC<PkwtAlertCardProps> = ({
                     </span>
                   </td>
                   {onActionClick && (
-                    <td className="py-3.5 px-4 text-right no-print whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-right no-print print:hidden whitespace-nowrap">
                       <button
                         onClick={() => onActionClick(st.nip)}
                         className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs shadow-xs transition-all active:scale-95 cursor-pointer inline-flex items-center gap-1"

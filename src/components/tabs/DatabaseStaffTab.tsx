@@ -389,7 +389,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                 )}
                 <th className="py-3 px-3">PTKP</th>
                 <th className="py-3 px-3">Akhir PKWT</th>
-                <th className="py-3 px-3 text-right no-print">Aksi</th>
+                <th className="py-3 px-3 text-right no-print print:hidden">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -462,7 +462,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                         return null;
                       })()}
                     </td>
-                    <td className="py-3 px-3 text-right no-print">
+                    <td className="py-3 px-3 text-right no-print print:hidden">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => onViewProfile(st.nip)}

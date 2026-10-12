@@ -221,7 +221,7 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Top Controller Bar (No Print) */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 no-print">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 no-print print:hidden">
         <div className="flex flex-wrap items-center gap-3">
           {/* Mode Switcher */}
           {!isStaffPortal && (

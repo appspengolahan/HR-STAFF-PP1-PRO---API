@@ -130,7 +130,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header
-      className={`fixed ${isDevSupervisorVisible ? 'top-8' : 'top-0'} left-0 right-0 w-full h-14 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-30 transition-all duration-300 flex items-center justify-between px-3 sm:px-6 shadow-xs`}
+      className={`fixed ${isDevSupervisorVisible ? 'top-8' : 'top-0'} left-0 right-0 w-full h-14 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-30 transition-all duration-300 flex items-center justify-between px-3 sm:px-6 shadow-xs no-print print:hidden`}
     >
       {/* SISI KIRI: Brand & Judul Aplikasi Sejajar Persis dengan Menu Sidebar */}
       <div className="flex items-center gap-3 min-w-0 pr-2 pl-0.5 sm:pl-1">

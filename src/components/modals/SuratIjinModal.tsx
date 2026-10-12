@@ -63,10 +63,10 @@ export const SuratIjinModal: React.FC<SuratIjinModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 text-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-4xl max-h-[96vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200 print:static print:p-0 print:bg-transparent">
+      <div className="bg-white dark:bg-slate-900 text-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-4xl max-h-[96vh] flex flex-col overflow-hidden print:border-none print:shadow-none print:max-h-none print:w-auto">
         {/* Modal Controls (No Print) */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/80 no-print">
+        <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/80 no-print print:hidden">
           <div>
             <h2 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
               <span>Formulir Resmi Surat Permohonan Ijin</span>
@@ -96,7 +96,7 @@ export const SuratIjinModal: React.FC<SuratIjinModalProps> = ({
         </div>
 
         {/* Paper Container */}
-        <div className="p-4 sm:p-6 overflow-y-auto bg-slate-200 dark:bg-slate-950 flex justify-center items-center">
+        <div className="p-4 sm:p-6 overflow-y-auto bg-slate-200 dark:bg-slate-950 flex justify-center items-center print:p-0 print:bg-transparent print:overflow-visible">
           <div
             id="surat-ijin-print-paper"
             className="bg-white text-black shadow-2xl border border-slate-300 mx-auto"

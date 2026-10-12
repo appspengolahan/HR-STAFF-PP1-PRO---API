@@ -198,7 +198,7 @@ export const LemburTab: React.FC<LemburTabProps> = ({
       {/* Main Card: History & Action */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
         {/* Table Controls (No Print) */}
-        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 no-print bg-slate-50/50 dark:bg-slate-950/30">
+        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 no-print print:hidden bg-slate-50/50 dark:bg-slate-950/30">
           <div className="flex items-center gap-3">
             <div>
               <label className="block text-[11px] font-semibold text-slate-500 mb-1">Bulan</label>

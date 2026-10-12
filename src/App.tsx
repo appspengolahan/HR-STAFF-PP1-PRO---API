@@ -653,11 +653,11 @@ export default function App() {
 
       {/* Main Viewport */}
       <div
-        className={`flex-1 flex flex-col transition-all duration-300 pt-14 pb-24 lg:pb-10 ${
-          isDevSupervisorVisible ? 'mt-8' : ''
-        } ${sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-64'}`}
+        className={`flex-1 flex flex-col transition-all duration-300 pt-14 pb-24 lg:pb-10 print:pt-0 print:pb-0 print:m-0 print:p-0 ${
+          isDevSupervisorVisible ? 'mt-8 print:mt-0' : ''
+        } ${sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-64'} print:lg:ml-0`}
       >
-        <main className="flex-1 p-3 sm:p-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-3 sm:p-6 max-w-7xl w-full mx-auto print:p-0 print:m-0 print:max-w-none">
           {/* Mobile Install PWA Banner */}
           <div className="lg:hidden mb-3 no-print">
             <PWAInstallButton variant="mobile-banner" />
@@ -914,7 +914,7 @@ export default function App() {
 
       {/* GAS Live Sync Toast Notification */}
       {syncToastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 max-w-md p-4 bg-slate-900 text-white text-xs rounded-2xl shadow-2xl border border-slate-700 animate-in slide-in-from-bottom-5 duration-300 flex items-start gap-3">
+        <div className="fixed bottom-5 right-5 z-50 max-w-md p-4 bg-slate-900 text-white text-xs rounded-2xl shadow-2xl border border-slate-700 animate-in slide-in-from-bottom-5 duration-300 flex items-start gap-3 no-print print:hidden">
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 mt-1 shrink-0 animate-ping" />
           <div className="flex-1 leading-relaxed">
             <p className="font-semibold text-emerald-400 mb-0.5">Google Apps Script Sync</p>

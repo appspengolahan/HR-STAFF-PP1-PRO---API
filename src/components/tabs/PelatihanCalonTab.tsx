@@ -134,7 +134,7 @@ export const PelatihanCalonTab: React.FC<PelatihanCalonTabProps> = ({
       {/* Main Table Card */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
         {/* Controls */}
-        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between no-print bg-slate-50/50 dark:bg-slate-950/30">
+        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between no-print print:hidden bg-slate-50/50 dark:bg-slate-950/30">
           <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
             Daftar Calon Karyawan Dalam Masa Pelatihan ({calonList.length} Orang)
           </div>
@@ -161,7 +161,7 @@ export const PelatihanCalonTab: React.FC<PelatihanCalonTabProps> = ({
                 <th className="py-3 px-4 text-center">Durasi</th>
                 <th className="py-3 px-4 text-center">Sisa Waktu</th>
                 <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-right no-print">Tindakan</th>
+                <th className="py-3 px-4 text-right no-print print:hidden">Tindakan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -220,7 +220,7 @@ export const PelatihanCalonTab: React.FC<PelatihanCalonTabProps> = ({
                         {item.statusPelatihan}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right no-print">
+                    <td className="py-3 px-4 text-right no-print print:hidden">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => {
