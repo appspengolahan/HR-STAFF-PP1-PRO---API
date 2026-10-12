@@ -94,15 +94,13 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
     }
   }, [successToast]);
 
-  // Sync staffSearchQuery when formStaffNip changes
+  // Sync staffSearchQuery when formStaffNip changes (DO NOT reset while user is typing)
   useEffect(() => {
     if (formStaffNip) {
       const st = staffList.find((s) => s.nip === formStaffNip);
       if (st) {
         setStaffSearchQuery(st.nama);
       }
-    } else {
-      setStaffSearchQuery('');
     }
   }, [formStaffNip, staffList]);
 
@@ -114,7 +112,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
         const st = staffList.find((s) => s.nip === formStaffNip);
         if (st) {
           setStaffSearchQuery(st.nama);
-        } else if (!formStaffNip) {
+        } else if (!formStaffNip && !staffSearchQuery.trim()) {
           setStaffSearchQuery('');
         }
       }
@@ -123,7 +121,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isStaffDropdownOpen, formStaffNip, staffList]);
+  }, [isStaffDropdownOpen, formStaffNip, staffList, staffSearchQuery]);
 
   // Staff suggestions filtered only by name / nip
   const staffSuggestions = useMemo(() => {
@@ -162,6 +160,38 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
     }
   };
 
+  // Helper jadwal jam kerja resmi sesuai ketentuan hari kerja PT Batu Karang
+  const getStandardWorkingHoursForDate = (dateStr: string) => {
+    const hari = getNamaHariIndo(dateStr);
+    if (hari === 'Sabtu') {
+      return { jamAwal: '08:00', jamAkhir: '13:00', durasiMenit: 300, hari };
+    }
+    if (hari === 'Jumat') {
+      return { jamAwal: '08:00', jamAkhir: '16:30', durasiMenit: 420, hari };
+    }
+    // Senin - Kamis
+    return { jamAwal: '08:00', jamAkhir: '16:00', durasiMenit: 420, hari };
+  };
+
+  // Handlers for Add Form Sehari Penuh & Tanggal
+  const handleToggleFormSehariPenuh = (checked: boolean) => {
+    setFormSehariPenuh(checked);
+    if (checked && formTglAwal) {
+      const std = getStandardWorkingHoursForDate(formTglAwal);
+      setFormJamAwal(std.jamAwal);
+      setFormJamAkhir(std.jamAkhir);
+    }
+  };
+
+  const handleFormTglAwalChange = (tgl: string) => {
+    setFormTglAwal(tgl);
+    if (formSehariPenuh && tgl) {
+      const std = getStandardWorkingHoursForDate(tgl);
+      setFormJamAwal(std.jamAwal);
+      setFormJamAkhir(std.jamAkhir);
+    }
+  };
+
   // Surat Ijin Modal
   const [selectedRecordForSurat, setSelectedRecordForSurat] = useState<PresensiRecord | null>(null);
 
@@ -170,6 +200,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   const [editTanggal, setEditTanggal] = useState('');
   const [editStaffNip, setEditStaffNip] = useState('');
   const [editJenisIjin, setEditJenisIjin] = useState<JenisIjin>('Ijin Terlambat');
+  const [editSehariPenuh, setEditSehariPenuh] = useState(false);
   const [editJamAwal, setEditJamAwal] = useState('08:00');
   const [editJamAkhir, setEditJamAkhir] = useState('10:00');
   const [editDurasiMenit, setEditDurasiMenit] = useState(120);
@@ -237,6 +268,15 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
     setEditJamAwal(rec.jamAwal || '');
     setEditJamAkhir(rec.jamAkhir || '');
 
+    const std = getStandardWorkingHoursForDate(isoDate);
+    const isFullDay =
+      rec.durasiMenit === std.durasiMenit ||
+      (rec.jamAwal === std.jamAwal && rec.jamAkhir === std.jamAkhir) ||
+      rec.jenisIjin === 'Sakit (S Tangan)' ||
+      rec.jenisIjin === 'Ijin (S Tangan)' ||
+      rec.jenisIjin === 'Alpha';
+    setEditSehariPenuh(Boolean(isFullDay));
+
     // Hitung durasi aktual otomatis dari jamAwal dan jamAkhir jika tersedia
     let durasi = rec.durasiMenit || 0;
     if (rec.jamAwal && rec.jamAkhir) {
@@ -252,6 +292,28 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
     setEditKeperluan(rec.keperluan || '');
     setEditLampiranSurat(rec.lampiranSurat || 'Tidak');
     setEditCatatan(rec.catatan || '');
+  };
+
+  const handleEditTanggalChange = (tgl: string) => {
+    setEditTanggal(tgl);
+    if (editSehariPenuh && tgl) {
+      const std = getStandardWorkingHoursForDate(tgl);
+      setEditJamAwal(std.jamAwal);
+      setEditJamAkhir(std.jamAkhir);
+      setEditDurasiMenit(std.durasiMenit);
+      setEditFaktorPotongan(computeFaktor(editJenisIjin, std.durasiMenit, editLampiranSurat));
+    }
+  };
+
+  const handleToggleEditSehariPenuh = (checked: boolean) => {
+    setEditSehariPenuh(checked);
+    if (checked && editTanggal) {
+      const std = getStandardWorkingHoursForDate(editTanggal);
+      setEditJamAwal(std.jamAwal);
+      setEditJamAkhir(std.jamAkhir);
+      setEditDurasiMenit(std.durasiMenit);
+      setEditFaktorPotongan(computeFaktor(editJenisIjin, std.durasiMenit, editLampiranSurat));
+    }
   };
 
   const handleSaveEdit = (e: React.FormEvent) => {
@@ -753,9 +815,12 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                     type="date"
                     required
                     value={formTglAwal}
-                    onChange={(e) => setFormTglAwal(e.target.value)}
+                    onChange={(e) => handleFormTglAwalChange(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg text-xs"
                   />
+                  <span className="text-[11px] text-slate-500 font-medium mt-0.5 block">
+                    Hari: <strong>{getNamaHariIndo(formTglAwal)}</strong>
+                  </span>
                 </div>
                 <div>
                   <label className="block font-semibold mb-1">
@@ -927,15 +992,38 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                   type="checkbox"
                   id="sehariPenuhCb"
                   checked={formSehariPenuh}
-                  onChange={(e) => setFormSehariPenuh(e.target.checked)}
+                  onChange={(e) => handleToggleFormSehariPenuh(e.target.checked)}
                   className="w-4 h-4 text-blue-600 rounded"
                 />
                 <label htmlFor="sehariPenuhCb" className="font-medium cursor-pointer">
-                  Sehari Penuh (Jam otomatis terisi sesuai jadwal jam kerja resmi)
+                  Sehari Penuh (Jam otomatis terisi sesuai jadwal jam kerja resmi {formTglAwal ? `hari ${getNamaHariIndo(formTglAwal)}` : ''})
                 </label>
               </div>
 
-              {!formSehariPenuh && (
+              {formSehariPenuh ? (
+                <div className="p-3 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div>
+                    <div className="font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span>Jadwal Jam Kerja Resmi ({getNamaHariIndo(formTglAwal)}): <strong>{formJamAwal} – {formJamAkhir}</strong></span>
+                    </div>
+                    <div className="text-[11px] text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                      Durasi Baku: <strong>{calculateDurasiMenit(formJamAwal, formJamAkhir)} Menit</strong> ({getNamaHariIndo(formTglAwal) === 'Sabtu' ? '5 Jam Kerja' : '7 Jam Kerja Bersih'})
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded font-bold text-[11px] font-mono self-start sm:self-auto ${
+                    computeFaktor(formJenisIjin, calculateDurasiMenit(formJamAwal, formJamAkhir), formLampiran) > 0
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
+                      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
+                  }`}>
+                    Faktor Potongan: {computeFaktor(formJenisIjin, calculateDurasiMenit(formJamAwal, formJamAkhir), formLampiran) === 0
+                      ? '0 (Dibayar Penuh)'
+                      : computeFaktor(formJenisIjin, calculateDurasiMenit(formJamAwal, formJamAkhir), formLampiran) === 0.5
+                      ? '0,5 (Potong Setengah Hari)'
+                      : '1,0 (Hangus 1 Hari)'}
+                  </span>
+                </div>
+              ) : (
                 <>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -1068,9 +1156,12 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                     type="date"
                     required
                     value={editTanggal}
-                    onChange={(e) => setEditTanggal(e.target.value)}
+                    onChange={(e) => handleEditTanggalChange(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"
                   />
+                  <span className="text-[11px] text-slate-500 font-medium mt-0.5 block">
+                    Hari: <strong>{getNamaHariIndo(editTanggal)}</strong>
+                  </span>
                 </div>
 
                 <div>
@@ -1129,85 +1220,125 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
-                    Jam Awal
-                  </label>
-                  <input
-                    type="time"
-                    value={editJamAwal}
-                    onChange={(e) => {
-                      const newAwal = e.target.value;
-                      setEditJamAwal(newAwal);
-                      if (newAwal && editJamAkhir) {
-                        const dur = calculateDurasiMenit(newAwal, editJamAkhir);
-                        setEditDurasiMenit(dur);
-                        let j = editJenisIjin;
-                        if (newAwal >= '12:00' && (editJamAkhir >= '16:00') && j === 'Ijin Terlambat') {
-                          j = 'Ijin Pulang Awal';
-                          setEditJenisIjin(j);
-                        }
-                        setEditFaktorPotongan(computeFaktor(j, dur, editLampiranSurat));
-                      }
-                    }}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
-                    Jam Akhir
-                  </label>
-                  <input
-                    type="time"
-                    value={editJamAkhir}
-                    onChange={(e) => {
-                      const newAkhir = e.target.value;
-                      setEditJamAkhir(newAkhir);
-                      if (editJamAwal && newAkhir) {
-                        const dur = calculateDurasiMenit(editJamAwal, newAkhir);
-                        setEditDurasiMenit(dur);
-                        let j = editJenisIjin;
-                        if (editJamAwal >= '12:00' && (newAkhir >= '16:00') && j === 'Ijin Terlambat') {
-                          j = 'Ijin Pulang Awal';
-                          setEditJenisIjin(j);
-                        }
-                        setEditFaktorPotongan(computeFaktor(j, dur, editLampiranSurat));
-                      }
-                    }}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
-                    Durasi (Menit)
-                  </label>
-                  <input
-                    type="number"
-                    value={editDurasiMenit}
-                    onChange={(e) => {
-                      const val = Number(e.target.value) || 0;
-                      setEditDurasiMenit(val);
-                      setEditFaktorPotongan(computeFaktor(editJenisIjin, val, editLampiranSurat));
-                    }}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono"
-                  />
-                </div>
+              <div className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="editSehariPenuhCb"
+                  checked={editSehariPenuh}
+                  onChange={(e) => handleToggleEditSehariPenuh(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded"
+                />
+                <label htmlFor="editSehariPenuhCb" className="font-medium cursor-pointer">
+                  Sehari Penuh (Jadwal otomatis {getNamaHariIndo(editTanggal)}: {getStandardWorkingHoursForDate(editTanggal).jamAwal} – {getStandardWorkingHoursForDate(editTanggal).jamAkhir} [{getStandardWorkingHoursForDate(editTanggal).durasiMenit} Menit])
+                </label>
               </div>
 
-              {/* Informative Auto-calculation banner in edit modal */}
-              <div className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 text-xs flex items-center justify-between">
-                <span className="text-slate-600 dark:text-slate-300">
-                  Perhitungan Otomatis: <strong className="font-mono text-slate-900 dark:text-white">{editDurasiMenit} Menit</strong>
-                </span>
-                <span className={`px-2.5 py-0.5 rounded font-bold text-[11px] font-mono ${
-                  editFaktorPotongan > 0
-                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
-                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
-                }`}>
-                  Faktor: {editFaktorPotongan === 0 ? '0 (Dibayar Penuh)' : editFaktorPotongan === 0.5 ? '0,5 (Setengah Hari)' : '1,0 (Hangus 1 Hari)'}
-                </span>
-              </div>
+              {editSehariPenuh ? (
+                <div className="p-3 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div>
+                    <div className="font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span>Jadwal Jam Kerja Resmi ({getNamaHariIndo(editTanggal)}): <strong>{editJamAwal} – {editJamAkhir}</strong></span>
+                    </div>
+                    <div className="text-[11px] text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                      Durasi Baku: <strong>{editDurasiMenit} Menit</strong> ({getNamaHariIndo(editTanggal) === 'Sabtu' ? '5 Jam Kerja' : '7 Jam Kerja Bersih'})
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded font-bold text-[11px] font-mono self-start sm:self-auto ${
+                    editFaktorPotongan > 0
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
+                      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
+                  }`}>
+                    Faktor: {editFaktorPotongan === 0
+                      ? '0 (Dibayar Penuh)'
+                      : editFaktorPotongan === 0.5
+                      ? '0,5 (Potong Setengah Hari)'
+                      : '1,0 (Hangus 1 Hari)'}
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                        Jam Awal
+                      </label>
+                      <input
+                        type="time"
+                        value={editJamAwal}
+                        onChange={(e) => {
+                          const newAwal = e.target.value;
+                          setEditJamAwal(newAwal);
+                          if (newAwal && editJamAkhir) {
+                            const dur = calculateDurasiMenit(newAwal, editJamAkhir);
+                            setEditDurasiMenit(dur);
+                            let j = editJenisIjin;
+                            if (newAwal >= '12:00' && (editJamAkhir >= '16:00') && j === 'Ijin Terlambat') {
+                              j = 'Ijin Pulang Awal';
+                              setEditJenisIjin(j);
+                            }
+                            setEditFaktorPotongan(computeFaktor(j, dur, editLampiranSurat));
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                        Jam Akhir
+                      </label>
+                      <input
+                        type="time"
+                        value={editJamAkhir}
+                        onChange={(e) => {
+                          const newAkhir = e.target.value;
+                          setEditJamAkhir(newAkhir);
+                          if (editJamAwal && newAkhir) {
+                            const dur = calculateDurasiMenit(editJamAwal, newAkhir);
+                            setEditDurasiMenit(dur);
+                            let j = editJenisIjin;
+                            if (editJamAwal >= '12:00' && (newAkhir >= '16:00') && j === 'Ijin Terlambat') {
+                              j = 'Ijin Pulang Awal';
+                              setEditJenisIjin(j);
+                            }
+                            setEditFaktorPotongan(computeFaktor(j, dur, editLampiranSurat));
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                        Durasi (Menit)
+                      </label>
+                      <input
+                        type="number"
+                        value={editDurasiMenit}
+                        onChange={(e) => {
+                          const val = Number(e.target.value) || 0;
+                          setEditDurasiMenit(val);
+                          setEditFaktorPotongan(computeFaktor(editJenisIjin, val, editLampiranSurat));
+                        }}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Informative Auto-calculation banner in edit modal */}
+                  <div className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 text-xs flex items-center justify-between">
+                    <span className="text-slate-600 dark:text-slate-300">
+                      Perhitungan Otomatis: <strong className="font-mono text-slate-900 dark:text-white">{editDurasiMenit} Menit</strong>
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded font-bold text-[11px] font-mono ${
+                      editFaktorPotongan > 0
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
+                    }`}>
+                      Faktor: {editFaktorPotongan === 0 ? '0 (Dibayar Penuh)' : editFaktorPotongan === 0.5 ? '0,5 (Setengah Hari)' : '1,0 (Hangus 1 Hari)'}
+                    </span>
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
