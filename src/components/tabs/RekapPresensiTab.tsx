@@ -47,8 +47,42 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
 
   // Toggle for Line Trend Chart Metric
   const [trendMetric, setTrendMetric] = useState<'kehadiran' | 'ijin'>('kehadiran');
+  const [tableShowAllMonths, setTableShowAllMonths] = useState<boolean>(false);
 
-  const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  const monthsShort = useMemo(
+    () => ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
+    []
+  );
+
+  // Periode Label dinamik (contoh: "Jan – Des", "Jul – Okt", "Oktober")
+  const periodeLabel = useMemo(() => {
+    if (bulanAwal === bulanAkhir) {
+      return NAMA_BULAN_INDO[bulanAwal - 1];
+    }
+    const minB = Math.min(bulanAwal, bulanAkhir);
+    const maxB = Math.max(bulanAwal, bulanAkhir);
+    return `${monthsShort[minB - 1]} – ${monthsShort[maxB - 1]}`;
+  }, [bulanAwal, bulanAkhir, monthsShort]);
+
+  // Safe Month Handlers to prevent invalid ranges
+  const handleBulanAwalChange = (val: number) => {
+    setBulanAwal(val);
+    if (val > bulanAkhir) {
+      setBulanAkhir(val);
+    }
+  };
+
+  const handleBulanAkhirChange = (val: number) => {
+    setBulanAkhir(val);
+    if (val < bulanAwal) {
+      setBulanAwal(val);
+    }
+  };
+
+  const setPeriodePreset = (awal: number, akhir: number) => {
+    setBulanAwal(awal);
+    setBulanAkhir(akhir);
+  };
 
   // 1. Calculate annual summary per staff
   const staffRekapList = useMemo(() => {
@@ -168,7 +202,38 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
     });
   }, [presensiList, staffList, filterTahun, effectiveNip]);
 
-  // 3. Ranked staff list for all 32 staff
+  // 3. Active Trend Data Filtered by Selected Month Range (Menjawab filter rentang bulan)
+  const activeTrendData = useMemo(() => {
+    const minB = Math.min(bulanAwal, bulanAkhir);
+    const maxB = Math.max(bulanAwal, bulanAkhir);
+    return monthlyTrendData.filter((m) => m.bulanNum >= minB && m.bulanNum <= maxB);
+  }, [monthlyTrendData, bulanAwal, bulanAkhir]);
+
+  // Displayed Months for Master Matrix Table
+  const displayedMonths = useMemo(() => {
+    const minB = Math.min(bulanAwal, bulanAkhir);
+    const maxB = Math.max(bulanAwal, bulanAkhir);
+    if (tableShowAllMonths) {
+      return monthsShort.map((namaPendek, idx) => ({
+        idx,
+        bulanNum: idx + 1,
+        namaPendek,
+        namaLengkap: NAMA_BULAN_INDO[idx],
+        isActive: idx + 1 >= minB && idx + 1 <= maxB,
+      }));
+    }
+    return monthsShort
+      .map((namaPendek, idx) => ({
+        idx,
+        bulanNum: idx + 1,
+        namaPendek,
+        namaLengkap: NAMA_BULAN_INDO[idx],
+        isActive: true,
+      }))
+      .filter((m) => m.bulanNum >= minB && m.bulanNum <= maxB);
+  }, [monthsShort, tableShowAllMonths, bulanAwal, bulanAkhir]);
+
+  // 4. Ranked staff list for all 32 staff
   const allStaffRanked = useMemo(() => {
     const sorted = [...staffRekapList].sort((a, b) => {
       if (sortDirection === 'desc') {
@@ -188,7 +253,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
     });
   }, [staffRekapList, sortDirection, searchStaff, filterUnit]);
 
-  // 4. Overall KPI Summary
+  // 5. Overall KPI Summary
   const kpiSummary = useMemo(() => {
     if (staffRekapList.length === 0) return { avgPct: 100, perfectCount: 0, totalIjinJam: 0, highestMonth: 'Oktober' };
 
@@ -198,9 +263,10 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
     const totalIjinMenitAll = staffRekapList.reduce((acc, s) => acc + s.totalIjinPeriode, 0);
     const totalIjinJam = Math.round((totalIjinMenitAll / 60) * 10) / 10;
 
-    // Find month with highest percentage / lowest izin
-    let bestM = monthlyTrendData[0];
-    monthlyTrendData.forEach((m) => {
+    // Find month with highest percentage / lowest izin in active period
+    const pool = activeTrendData.length > 0 ? activeTrendData : monthlyTrendData;
+    let bestM = pool[0];
+    pool.forEach((m) => {
       if (
         m.pctKehadiran > bestM.pctKehadiran ||
         (m.pctKehadiran === bestM.pctKehadiran && m.totalIjinMenit < bestM.totalIjinMenit)
@@ -209,8 +275,8 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
       }
     });
 
-    const allZeroIjin = monthlyTrendData.every((m) => m.totalIjinMenit === 0);
-    const highestMonth = allZeroIjin ? '100% Sepanjang Tahun' : (bestM?.nama || 'Oktober');
+    const allZeroIjin = pool.every((m) => m.totalIjinMenit === 0);
+    const highestMonth = allZeroIjin ? '100% Sepanjang Periode' : (bestM?.nama || 'Oktober');
 
     return {
       avgPct,
@@ -218,7 +284,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
       totalIjinJam,
       highestMonth,
     };
-  }, [staffRekapList, monthlyTrendData]);
+  }, [staffRekapList, activeTrendData, monthlyTrendData]);
 
   const handleExportPdf = () => {
     const originalTitle = document.title;
@@ -246,8 +312,9 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
   const plotWidth = svgWidth - padLeft - padRight;
   const plotHeight = svgHeight - padTop - padBottom;
 
-  // Determine Y-scale
-  const values = monthlyTrendData.map((m) =>
+  // Determine Y-scale based on activeTrendData (merespon rentang bulan)
+  const chartDataSource = activeTrendData.length > 0 ? activeTrendData : monthlyTrendData;
+  const values = chartDataSource.map((m) =>
     trendMetric === 'kehadiran' ? m.pctKehadiran : m.pctIjin
   );
 
@@ -255,9 +322,9 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
   let yMax = trendMetric === 'kehadiran' ? 100.5 : 5.5;
 
   if (trendMetric === 'kehadiran') {
-    const minVal = Math.min(...values);
+    const minVal = values.length > 0 ? Math.min(...values) : 100;
     if (minVal >= 99.9) {
-      // Sempurna 100% sepanjang tahun: baseline 95% agar garis horizontal terlihat elegan di bagian atas
+      // Sempurna 100%: baseline 95% agar garis horizontal terlihat elegan di bagian atas
       yMin = 95.0;
       yMax = 100.5;
     } else {
@@ -266,7 +333,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
       yMax = 100.5;
     }
   } else {
-    const maxVal = Math.max(...values);
+    const maxVal = values.length > 0 ? Math.max(...values) : 0;
     if (maxVal <= 0.1) {
       yMin = 0.0;
       yMax = 5.0;
@@ -278,24 +345,33 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
 
   const yRange = yMax - yMin || 1;
 
-  // Points coordinates
-  const points = monthlyTrendData.map((m, idx) => {
-    const x = padLeft + (idx / (monthlyTrendData.length - 1)) * plotWidth;
+  // Points coordinates (responsif terhadap jumlah bulan yang dipilih)
+  const points = chartDataSource.map((m, idx) => {
+    const x =
+      chartDataSource.length > 1
+        ? padLeft + (idx / (chartDataSource.length - 1)) * plotWidth
+        : padLeft + plotWidth / 2;
     const val = trendMetric === 'kehadiran' ? m.pctKehadiran : m.pctIjin;
     const y = padTop + plotHeight - ((val - yMin) / yRange) * plotHeight;
     return { x, y, val, month: m };
   });
 
-  // SVG Line path
-  const linePathD = points.reduce((acc, p, idx) => {
-    return idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
-  }, '');
+  // SVG Line path (tangani kasus 1 bulan maupun banyak bulan)
+  const linePathD =
+    points.length === 1
+      ? `M ${points[0].x - 60} ${points[0].y} L ${points[0].x + 60} ${points[0].y}`
+      : points.reduce((acc, p, idx) => {
+          return idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
+        }, '');
 
   // SVG Area path (fading to bottom)
   const baselineY = padTop + plotHeight;
-  const areaPathD = points.length > 0
-    ? `${linePathD} L ${points[points.length - 1].x} ${baselineY} L ${points[0].x} ${baselineY} Z`
-    : '';
+  const areaPathD =
+    points.length === 1
+      ? `M ${points[0].x - 60} ${points[0].y} L ${points[0].x + 60} ${points[0].y} L ${points[0].x + 60} ${baselineY} L ${points[0].x - 60} ${baselineY} Z`
+      : points.length > 1
+      ? `${linePathD} L ${points[points.length - 1].x} ${baselineY} L ${points[0].x} ${baselineY} Z`
+      : '';
 
   // Y-axis grid ticks (5 steps)
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((pct) => {
@@ -332,7 +408,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
               </label>
               <select
                 value={bulanAwal}
-                onChange={(e) => setBulanAwal(Number(e.target.value))}
+                onChange={(e) => handleBulanAwalChange(Number(e.target.value))}
                 className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white"
               >
                 {NAMA_BULAN_INDO.map((bln, i) => (
@@ -349,7 +425,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
               </label>
               <select
                 value={bulanAkhir}
-                onChange={(e) => setBulanAkhir(Number(e.target.value))}
+                onChange={(e) => handleBulanAkhirChange(Number(e.target.value))}
                 className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white"
               >
                 {NAMA_BULAN_INDO.map((bln, i) => (
@@ -358,6 +434,59 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="flex flex-col">
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                Preset Cepat
+              </label>
+              <div className="flex items-center gap-1 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setPeriodePreset(1, 12)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                    bulanAwal === 1 && bulanAkhir === 12
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  1 Tahun (12 Bln)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriodePreset(1, 6)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                    bulanAwal === 1 && bulanAkhir === 6
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  Smt 1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriodePreset(7, 12)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                    bulanAwal === 7 && bulanAkhir === 12
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  Smt 2
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriodePreset(10, 10)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                    bulanAwal === 10 && bulanAkhir === 10
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  Okt
+                </button>
+              </div>
             </div>
 
             {!isStaffPortal && (
@@ -486,7 +615,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
             <div>
               <h2 className="text-sm font-bold text-slate-900 dark:text-white flex flex-wrap items-center gap-2">
                 <span>
-                  Grafik Tren Tingkat Kehadiran Bulanan {selectedStaff ? `— ${selectedStaff.nama}` : ''} (Jan – Des {filterTahun})
+                  Grafik Tren Tingkat Kehadiran Bulanan {selectedStaff ? `— ${selectedStaff.nama}` : ''} ({periodeLabel} {filterTahun})
                 </span>
                 {selectedStaff && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
@@ -707,7 +836,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                Grafik Balok Peringkat Kehadiran Staf (Evaluasi Tahunan Seluruh Karyawan)
+                Grafik Balok Peringkat Kehadiran Staf (Evaluasi Periode {periodeLabel} {filterTahun})
               </h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {sortDirection === 'asc'
@@ -913,18 +1042,30 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
       {/* 3. TABEL MASTER DETAIL 12 BULAN (MATRIX REKAP LENGKAP)         */}
       {/* ============================================================== */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/30">
+        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-950/30">
           <div>
-            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-              Tabel Matriks Rekapitulasi Izin Staf (Jan – Des {filterTahun})
+            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <span>Tabel Matriks Rekapitulasi Izin Staf ({periodeLabel} {filterTahun})</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                {displayedMonths.length} Bulan Ditampilkan
+              </span>
             </h3>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Rincian menit izin yang terakumulasi setiap bulan per individu staf
+              Rincian menit izin yang terakumulasi per bulan untuk masing-masing staf pada periode {periodeLabel}
             </p>
           </div>
-          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 no-print">
-            {staffRekapList.length} Staf Terdata
-          </span>
+          <div className="flex items-center gap-2 no-print">
+            <button
+              type="button"
+              onClick={() => setTableShowAllMonths(!tableShowAllMonths)}
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-xs cursor-pointer"
+            >
+              {tableShowAllMonths ? '🔍 Fokus Rentang Terpilih Saja' : '📅 Tampilkan 12 Bulan Penuh'}
+            </button>
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+              {staffRekapList.length} Staf Terdata
+            </span>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -933,12 +1074,19 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
               <tr>
                 <th className="py-3 px-3">Nama Karyawan</th>
                 <th className="py-3 px-2 text-slate-500 font-mono">NIP</th>
-                {monthsShort.map((m) => (
-                  <th key={m} className="py-3 px-2 text-center font-mono">
-                    {m}
+                {displayedMonths.map((m) => (
+                  <th
+                    key={m.bulanNum}
+                    className={`py-3 px-2 text-center font-mono ${
+                      m.isActive && tableShowAllMonths
+                        ? 'bg-blue-100/70 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-bold'
+                        : ''
+                    }`}
+                  >
+                    {m.namaPendek}
                   </th>
                 ))}
-                <th className="py-3 px-3 text-right">Tot. Ijin (m)</th>
+                <th className="py-3 px-3 text-right">Tot. Ijin ({periodeLabel})</th>
                 <th className="py-3 px-3 text-right">% Kehadiran</th>
               </tr>
             </thead>
@@ -953,18 +1101,23 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
                       {st.nama}
                     </td>
                     <td className="py-2.5 px-2 text-slate-400">{st.nip}</td>
-                    {st.bulananMenit.map((menit, idx) => (
-                      <td
-                        key={idx}
-                        className={`py-2.5 px-2 text-center ${
-                          menit > 0
-                            ? 'text-red-600 dark:text-red-400 font-bold bg-red-50/50 dark:bg-red-950/20'
-                            : 'text-slate-300 dark:text-slate-600'
-                        }`}
-                      >
-                        {menit || '0'}
-                      </td>
-                    ))}
+                    {displayedMonths.map((m) => {
+                      const menit = st.bulananMenit[m.idx];
+                      return (
+                        <td
+                          key={m.bulanNum}
+                          className={`py-2.5 px-2 text-center ${
+                            m.isActive && tableShowAllMonths ? 'bg-blue-50/30 dark:bg-blue-950/20' : ''
+                          } ${
+                            menit > 0
+                              ? 'text-red-600 dark:text-red-400 font-bold bg-red-50/50 dark:bg-red-950/20'
+                              : 'text-slate-300 dark:text-slate-600'
+                          }`}
+                        >
+                          {menit || '0'}
+                        </td>
+                      );
+                    })}
                     <td className="py-2.5 px-3 text-right font-bold text-slate-700 dark:text-slate-300">
                       {st.totalIjinPeriode} m
                     </td>
