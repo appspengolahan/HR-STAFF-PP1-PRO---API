@@ -76,36 +76,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       className={`fixed ${
-        isDevSupervisorVisible ? 'top-8 h-[calc(100vh-32px)]' : 'top-0 h-screen'
-      } left-0 z-30 hidden lg:flex flex-col bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 select-none ${
+        isDevSupervisorVisible ? 'top-[88px] h-[calc(100vh-88px)]' : 'top-14 h-[calc(100vh-56px)]'
+      } left-0 z-20 hidden lg:flex flex-col bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 select-none ${
         collapsed ? 'w-[68px]' : 'w-64'
       }`}
     >
-      {/* Top Brand Banner */}
-      <div className="h-14 flex items-center justify-between px-3 border-b border-slate-800 bg-slate-950/60">
-        <div
-          onClick={onOpenSwitchBoard}
-          className="flex items-center gap-3 overflow-hidden cursor-pointer group"
-          title="Buka Master Switch Board PP1"
-        >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 via-indigo-600 to-cyan-500 flex items-center justify-center text-white font-black shadow-md shadow-blue-900/30 group-hover:scale-105 transition-transform shrink-0">
-            BK
-          </div>
-          {!collapsed && (
-            <div className="leading-tight truncate">
-              <span className="font-extrabold text-sm tracking-wide text-white flex items-center gap-1.5">
-                PT BATU KARANG
-              </span>
-              <span className="text-[10px] text-cyan-400 font-semibold tracking-wider uppercase">
-                Divisi Produksi I (PP1)
-              </span>
+      {/* Top Header Controls: Mini Sidebar Mode Toggle di Bagian Atas */}
+      <div className="p-2 border-b border-slate-800/90 bg-slate-950/60 flex items-center justify-center shrink-0">
+        {collapsed ? (
+          <button
+            onClick={onToggleCollapse}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800/90 hover:bg-blue-600 text-cyan-400 hover:text-white transition-all group border border-slate-700/70 shadow-xs cursor-pointer active:scale-95"
+            title="Perluas Sidebar (Tampilkan Penuh)"
+          >
+            <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        ) : (
+          <button
+            onClick={onToggleCollapse}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white transition-all text-xs font-semibold group border border-slate-700/60 hover:border-slate-600 shadow-xs cursor-pointer active:scale-[0.98]"
+            title="Ciutkan Sidebar ke Mini Sidebar Mode"
+          >
+            <div className="flex items-center gap-2 min-w-0 truncate">
+              <ChevronLeft className="w-4 h-4 text-cyan-400 group-hover:-translate-x-0.5 transition-transform shrink-0" />
+              <span className="font-bold tracking-tight truncate">Mini Sidebar Mode</span>
             </div>
-          )}
-        </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 group-hover:bg-blue-600 group-hover:text-white transition-colors shrink-0">
+              Ciutkan
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Navigation List */}
-      <div className="flex-1 py-4 overflow-y-auto px-2 space-y-1">
+      <div className="flex-1 py-3 overflow-y-auto px-2 space-y-1">
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -146,30 +150,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      {/* Collapse Toggle & Footer */}
-      <div className="p-3 border-t border-slate-800 bg-slate-950/60 flex flex-col gap-2">
+      {/* Sidebar Footer */}
+      <div className="p-2.5 border-t border-slate-800 bg-slate-950/60 flex flex-col gap-2">
         {!collapsed && <PWAInstallButton variant="sidebar" />}
 
-        <button
-          onClick={onToggleCollapse}
-          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors text-xs font-semibold"
-          title={collapsed ? 'Perluas Sidebar' : 'Kecilkan Sidebar'}
-        >
-          {collapsed ? (
-            <ChevronRight className="w-4 h-4" />
-          ) : (
-            <>
-              <ChevronLeft className="w-4 h-4" />
-              <span>Mini Sidebar Mode</span>
-            </>
-          )}
-        </button>
-
-        {!collapsed && (
-          <div className="text-[10px] text-slate-500 text-center leading-tight pt-1">
+        {!collapsed ? (
+          <div className="text-[10px] text-slate-500 text-center leading-tight pt-0.5">
             HR Staff All Rights Reserved
             <div className="text-[9px] text-slate-600">Developed by Lalu Mahendra</div>
           </div>
+        ) : (
+          <button
+            onClick={onOpenSwitchBoard}
+            className="w-full flex items-center justify-center py-2 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-slate-800/80 transition-colors cursor-pointer"
+            title="Buka Master Switch Board PP1"
+          >
+            <Layers className="w-4 h-4" />
+          </button>
         )}
       </div>
     </aside>

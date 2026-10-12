@@ -611,6 +611,7 @@ export default function App() {
         onToggleTheme={handleToggleTheme}
         onTriggerSecretDoor={() => setSecretDoorTriggered(true)}
         sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebar={handleToggleSidebar}
         isDevSupervisorVisible={isDevSupervisorVisible}
         isAutoRefreshActive={isAutoRefreshActive}
         onToggleAutoRefresh={handleToggleAutoRefresh}
