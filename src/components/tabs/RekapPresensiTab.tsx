@@ -98,8 +98,47 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
     });
   }, [staffList, presensiList, filterTahun, bulanAwal, bulanAkhir, filterStaffNip, isStaffPortal, currentUserNip]);
 
-  // 2. Calculate Monthly Trend (Jan - Des) across all active staff
+  // Active staff selection identification
+  const effectiveNip = isStaffPortal && currentUserNip ? currentUserNip : filterStaffNip;
+  const selectedStaff = useMemo(() => {
+    return effectiveNip ? staffList.find((s) => s.nip === effectiveNip) : null;
+  }, [staffList, effectiveNip]);
+
+  // 2. Calculate Monthly Trend (Jan - Des) across active staff or filtered individual staff
   const monthlyTrendData = useMemo(() => {
+    if (effectiveNip) {
+      // Individual Staff calculation: standard is 1 staff = 10,440 menit/bulan
+      const stdPerMonth = MENIT_PER_BULAN_STANDAR;
+
+      return monthsShort.map((namaPendek, idx) => {
+        const bulanNum = idx + 1;
+        const records = presensiList.filter(
+          (p) => p.nip === effectiveNip && p.tahun === filterTahun && p.bulan === bulanNum
+        );
+        const totalIjinMenit = records.reduce((acc, p) => acc + (p.durasiMenit || 0), 0);
+        const countIjin = records.length;
+        const pctKehadiran = Math.max(
+          0,
+          Math.min(100, ((stdPerMonth - totalIjinMenit) / stdPerMonth) * 100)
+        );
+        const pctIjin = Math.max(
+          0,
+          Math.min(100, (totalIjinMenit / stdPerMonth) * 100)
+        );
+
+        return {
+          bulanNum,
+          nama: NAMA_BULAN_INDO[idx],
+          namaPendek,
+          totalIjinMenit,
+          countIjin,
+          pctKehadiran,
+          pctIjin,
+        };
+      });
+    }
+
+    // Aggregate Divisi calculation across all active staff
     const activeStaffCount = staffList.filter((s) => s.statusAktif === 'Aktif').length || staffList.length || 1;
     const stdPerMonth = activeStaffCount * MENIT_PER_BULAN_STANDAR;
 
@@ -127,7 +166,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
         pctIjin,
       };
     });
-  }, [presensiList, staffList, filterTahun]);
+  }, [presensiList, staffList, filterTahun, effectiveNip]);
 
   // 3. Ranked staff list for all 32 staff
   const allStaffRanked = useMemo(() => {
@@ -159,19 +198,25 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
     const totalIjinMenitAll = staffRekapList.reduce((acc, s) => acc + s.totalIjinPeriode, 0);
     const totalIjinJam = Math.round((totalIjinMenitAll / 60) * 10) / 10;
 
-    // Find month with highest percentage
+    // Find month with highest percentage / lowest izin
     let bestM = monthlyTrendData[0];
     monthlyTrendData.forEach((m) => {
-      if (m.totalIjinMenit > 0 && m.pctKehadiran > (bestM.pctKehadiran || 0)) {
+      if (
+        m.pctKehadiran > bestM.pctKehadiran ||
+        (m.pctKehadiran === bestM.pctKehadiran && m.totalIjinMenit < bestM.totalIjinMenit)
+      ) {
         bestM = m;
       }
     });
+
+    const allZeroIjin = monthlyTrendData.every((m) => m.totalIjinMenit === 0);
+    const highestMonth = allZeroIjin ? '100% Sepanjang Tahun' : (bestM?.nama || 'Oktober');
 
     return {
       avgPct,
       perfectCount,
       totalIjinJam,
-      highestMonth: bestM?.nama || 'Oktober',
+      highestMonth,
     };
   }, [staffRekapList, monthlyTrendData]);
 
@@ -211,10 +256,24 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
 
   if (trendMetric === 'kehadiran') {
     const minVal = Math.min(...values);
-    yMin = Math.max(88, Math.floor(minVal - 1.5));
+    if (minVal >= 99.9) {
+      // Sempurna 100% sepanjang tahun: baseline 95% agar garis horizontal terlihat elegan di bagian atas
+      yMin = 95.0;
+      yMax = 100.5;
+    } else {
+      // Ada penurunan / izin: batas bawah dinamis dengan margin 1,5% agar kurva fluktuasi terlihat jelas
+      yMin = Math.max(0, Math.floor(minVal - 1.5));
+      yMax = 100.5;
+    }
   } else {
     const maxVal = Math.max(...values);
-    yMax = Math.max(3.5, Math.ceil(maxVal + 0.8));
+    if (maxVal <= 0.1) {
+      yMin = 0.0;
+      yMax = 5.0;
+    } else {
+      yMin = 0.0;
+      yMax = Math.max(3.0, Math.ceil(maxVal + 0.8));
+    }
   }
 
   const yRange = yMax - yMin || 1;
@@ -355,7 +414,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold mb-1">
-            <span>Rata-rata Kehadiran Divisi</span>
+            <span>{selectedStaff ? 'Tingkat Kehadiran Staf' : 'Rata-rata Kehadiran Divisi'}</span>
             <Percent className="w-4 h-4 text-blue-500" />
           </div>
           <div className="text-2xl font-black font-mono text-slate-900 dark:text-white">
@@ -369,24 +428,36 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
 
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold mb-1">
-            <span>Kehadiran 100% Sempurna</span>
+            <span>{selectedStaff ? 'Status Disiplin Sempurna' : 'Kehadiran 100% Sempurna'}</span>
             <Medal className="w-4 h-4 text-amber-500" />
           </div>
           <div className="text-2xl font-black font-mono text-amber-600 dark:text-amber-400">
-            {kpiSummary.perfectCount} <span className="text-xs font-sans text-slate-400">Staf</span>
+            {selectedStaff ? (
+              kpiSummary.avgPct >= 99.99 ? '100% Sempurna' : 'Ada Izin'
+            ) : (
+              <>
+                {kpiSummary.perfectCount} <span className="text-xs font-sans text-slate-400">Staf</span>
+              </>
+            )}
           </div>
-          <div className="text-[10px] text-slate-400 mt-1">Nol menit izin / potong upah</div>
+          <div className="text-[10px] text-slate-400 mt-1">
+            {selectedStaff
+              ? (kpiSummary.avgPct >= 99.99 ? 'Nol menit izin dalam periode' : `${kpiSummary.totalIjinJam} jam izin tercatat`)
+              : 'Nol menit izin / potong upah'}
+          </div>
         </div>
 
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold mb-1">
-            <span>Total Ijin / Jam Hilang</span>
+            <span>{selectedStaff ? 'Total Izin Staf' : 'Total Ijin / Jam Hilang'}</span>
             <Clock className="w-4 h-4 text-red-500" />
           </div>
           <div className="text-2xl font-black font-mono text-red-600 dark:text-red-400">
             {kpiSummary.totalIjinJam} <span className="text-xs font-sans text-slate-400">Jam</span>
           </div>
-          <div className="text-[10px] text-slate-400 mt-1">Akumulasi seluruh izin periode</div>
+          <div className="text-[10px] text-slate-400 mt-1">
+            {selectedStaff ? `Akumulasi izin ${selectedStaff.nama}` : 'Akumulasi seluruh izin periode'}
+          </div>
         </div>
 
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
@@ -394,10 +465,12 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
             <span>Disiplin Tertinggi</span>
             <Flame className="w-4 h-4 text-emerald-500" />
           </div>
-          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 truncate" title={kpiSummary.highestMonth}>
             {kpiSummary.highestMonth}
           </div>
-          <div className="text-[10px] text-slate-400 mt-1">Volume izin terendah tahun ini</div>
+          <div className="text-[10px] text-slate-400 mt-1">
+            {selectedStaff ? 'Bulan paling tertib / minim izin' : 'Volume izin terendah tahun ini'}
+          </div>
         </div>
       </div>
 
@@ -411,11 +484,20 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
               <TrendingUp className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                Grafik Tren Tingkat Kehadiran Bulanan (Jan – Des {filterTahun})
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex flex-wrap items-center gap-2">
+                <span>
+                  Grafik Tren Tingkat Kehadiran Bulanan {selectedStaff ? `— ${selectedStaff.nama}` : ''} (Jan – Des {filterTahun})
+                </span>
+                {selectedStaff && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                    {selectedStaff.nip} • {selectedStaff.sekup}
+                  </span>
+                )}
               </h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Visualisasi kurva garis persentase jam kerja efektif operasional PT Batu Karang
+                {selectedStaff
+                  ? `Visualisasi kurva garis persentase kehadiran bulanan staf: ${selectedStaff.nama} (${selectedStaff.jabatan})`
+                  : 'Visualisasi kurva garis persentase jam kerja efektif operasional PT Batu Karang'}
               </p>
             </div>
           </div>
@@ -590,7 +672,9 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
                       fontFamily="monospace"
                       className="fill-slate-400 dark:fill-slate-500"
                     >
-                      {p.month.totalIjinMenit > 0 ? `${Math.round(p.month.totalIjinMenit / 60)}j` : '0j'}
+                      {p.month.totalIjinMenit > 0
+                        ? `${(p.month.totalIjinMenit / 60).toFixed(1).replace('.0', '').replace('.', ',')}j`
+                        : '0j'}
                     </text>
                   </g>
                 );
@@ -603,7 +687,11 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
         <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 flex items-start gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
           <p className="leading-relaxed">
-            <strong>Analisis Tren Kehadiran Garis:</strong> Tingkat kehadiran staf stabil rata-rata <strong>{formatPctIndo(kpiSummary.avgPct)}</strong> (di atas batas toleransi 95%). Puncak disiplin tertinggi terjadi pada bulan <strong>{kpiSummary.highestMonth}</strong>, sementara kenaikan frekuensi izin terjadi di bulan Juli–September seiring agenda sosial dan tradisi keluarga staf.
+            <strong>Analisis Tren Kehadiran Garis:</strong> {selectedStaff ? (
+              <>Tingkat kehadiran <strong>{selectedStaff.nama}</strong> rata-rata <strong>{formatPctIndo(kpiSummary.avgPct)}</strong> dengan akumulasi izin <strong>{kpiSummary.totalIjinJam} jam</strong>. Disiplin terbaik berada pada bulan <strong>{kpiSummary.highestMonth}</strong>.</>
+            ) : (
+              <>Tingkat kehadiran staf stabil rata-rata <strong>{formatPctIndo(kpiSummary.avgPct)}</strong> (di atas batas toleransi 95%). Puncak disiplin tertinggi terjadi pada bulan <strong>{kpiSummary.highestMonth}</strong>, sementara fluktuasi izin dipengaruhi oleh agenda kerja dan pengajuan izin cuti/ijin staf.</>
+            )}
           </p>
         </div>
       </div>
