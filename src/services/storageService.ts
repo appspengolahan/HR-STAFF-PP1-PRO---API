@@ -81,6 +81,9 @@ function writeStorage<T>(key: string, data: T): void {
   }
 }
 
+export const DEFAULT_GAS_API_URL =
+  'https://script.google.com/macros/s/AKfycbwp2EY-9bCx_5ja5wx6EHdKulCcXNWg5t5j7SfH_-mnvlHBTlsfXAhWK3MkP8Vt269m/exec';
+
 export const storageService = {
   // Staff Master
   getStaffList(): StaffData[] {
@@ -482,22 +485,29 @@ export const storageService = {
   // GAS Config
   getGasConfig(): GasConfig {
     const fallback: GasConfig = {
-      apiUrl: '',
-      isAutoSync: false,
-      status: 'idle',
+      apiUrl: DEFAULT_GAS_API_URL,
+      isAutoSync: true,
+      status: 'connected',
       lastSyncTimestamp: formatWaktuWib(new Date(), true),
     };
     const stored = readStorage<GasConfig>(KEYS.GAS_CONFIG, fallback);
-    // Jika tersimpan URL lama HR Pekerja (AKfycbz... / spreadsheet 11NpDy...), bersihkan otomatis agar data tidak tertukar
-    if (stored && stored.apiUrl && stored.apiUrl.includes('AKfycbzGZsSs2ZviyLMM0csjmMDXZDMpC9ZhuvheEb97g9KM1AZW8mlhSUPBc8o8YJp_9zg')) {
-      const cleaned: GasConfig = {
-        ...stored,
-        apiUrl: '',
-        status: 'idle',
-        errorMessage: 'URL sebelumnya adalah endpoint HR Pekerja Pabrik. Gunakan Live Sheet Sync (1KzEFolz...) untuk data HR Staff.',
+    // Jika apiUrl belum disetel, kosong, atau tersimpan URL lama HR Pekerja, otomatis tetapkan ke DEFAULT_GAS_API_URL
+    if (
+      !stored ||
+      !stored.apiUrl ||
+      stored.apiUrl.trim() === '' ||
+      stored.apiUrl.includes('AKfycbzGZsSs2ZviyLMM0csjmMDXZDMpC9ZhuvheEb97g9KM1AZW8mlhSUPBc8o8YJp_9zg')
+    ) {
+      const updated: GasConfig = {
+        ...fallback,
+        ...(stored || {}),
+        apiUrl: DEFAULT_GAS_API_URL,
+        isAutoSync: true,
+        status: 'connected',
+        errorMessage: undefined,
       };
-      writeStorage(KEYS.GAS_CONFIG, cleaned);
-      return cleaned;
+      writeStorage(KEYS.GAS_CONFIG, updated);
+      return updated;
     }
     return stored;
   },

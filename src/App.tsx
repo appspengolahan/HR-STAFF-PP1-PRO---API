@@ -18,7 +18,7 @@ import {
   GasConfig,
   UserRole,
 } from './types';
-import { storageService } from './services/storageService';
+import { storageService, DEFAULT_GAS_API_URL } from './services/storageService';
 import { gasClient } from './services/gasClient';
 import { sheetSyncService } from './services/sheetSync';
 import { RoleSimulatorBar } from './components/RoleSimulatorBar';
@@ -133,12 +133,13 @@ export default function App() {
 
         // Mode Standar: GAS REST API
         const cfg = storageService.getGasConfig();
+        const activeUrl = cfg.apiUrl || DEFAULT_GAS_API_URL;
         const hasValidStaffGasUrl =
-          cfg.apiUrl &&
-          !cfg.apiUrl.includes('AKfycbzGZsSs2ZviyLMM0csjmMDXZDMpC9ZhuvheEb97g9KM1AZW8mlhSUPBc8o8YJp_9zg');
+          activeUrl &&
+          !activeUrl.includes('AKfycbzGZsSs2ZviyLMM0csjmMDXZDMpC9ZhuvheEb97g9KM1AZW8mlhSUPBc8o8YJp_9zg');
 
         if (hasValidStaffGasUrl) {
-          const res = await gasClient.fetchPresensi(cfg.apiUrl, staffList);
+          const res = await gasClient.fetchPresensi(activeUrl, staffList);
           if (res.status === 'success' && res.data && res.data.length > 0) {
             storageService.savePresensiList(res.data);
             const mergedPresensi = storageService.getPresensiList();
@@ -146,7 +147,7 @@ export default function App() {
             const octCount = mergedPresensi.filter((r) => r.bulan === 10 && r.tahun === 2026).length;
             if (!isSilent) {
               setSyncToastMessage(
-                `✓ [GAS REST] Berhasil sinkronisasi ${res.count} data presensi staf live dari GAS (${octCount} data di Oktober 2026, termasuk Matsukri 7 Okt)!`
+                `✓ [GAS REST] Berhasil sinkronisasi ${res.count} data presensi staf live dari GAS (${octCount} data di Oktober 2026)!`
               );
               setTimeout(() => setSyncToastMessage(null), 6000);
             }
@@ -413,8 +414,9 @@ export default function App() {
 
       // Sinkronisasi hapus 2-arah ke Spreadsheet jika GAS terhubung
       const cfg = storageService.getGasConfig();
-      if (cfg.apiUrl && staffTarget) {
-        gasClient.deleteStaff(cfg.apiUrl, { nip: staffTarget.nip, nama: staffTarget.nama }).catch((e) =>
+      const activeUrl = cfg.apiUrl || DEFAULT_GAS_API_URL;
+      if (activeUrl && staffTarget) {
+        gasClient.deleteStaff(activeUrl, { nip: staffTarget.nip, nama: staffTarget.nama }).catch((e) =>
           console.warn('Gagal sinkronisasi hapus staf ke Spreadsheet:', e)
         );
       }
@@ -427,8 +429,9 @@ export default function App() {
     setPresensiList(storageService.getPresensiList());
 
     const cfg = storageService.getGasConfig();
-    if (cfg.apiUrl) {
-      gasClient.pushPresensi(cfg.apiUrl, rec).catch((e) => console.warn('Gagal push presensi ke GAS:', e));
+    const activeUrl = cfg.apiUrl || DEFAULT_GAS_API_URL;
+    if (activeUrl) {
+      gasClient.pushPresensi(activeUrl, rec).catch((e) => console.warn('Gagal push presensi ke GAS:', e));
     }
   };
 
@@ -437,9 +440,10 @@ export default function App() {
     setPresensiList(storageService.getPresensiList());
 
     const cfg = storageService.getGasConfig();
-    if (cfg.apiUrl) {
+    const activeUrl = cfg.apiUrl || DEFAULT_GAS_API_URL;
+    if (activeUrl) {
       for (const rec of records) {
-        gasClient.pushPresensi(cfg.apiUrl, rec).catch((e) => console.warn('Gagal push presensi ke GAS:', e));
+        gasClient.pushPresensi(activeUrl, rec).catch((e) => console.warn('Gagal push presensi ke GAS:', e));
       }
     }
   };
@@ -451,9 +455,10 @@ export default function App() {
 
     // Sinkronisasi hapus 2-arah ke Spreadsheet jika GAS terhubung
     const cfg = storageService.getGasConfig();
-    if (cfg.apiUrl && targetRec) {
+    const activeUrl = cfg.apiUrl || DEFAULT_GAS_API_URL;
+    if (activeUrl && targetRec) {
       gasClient
-        .deletePresensi(cfg.apiUrl, {
+        .deletePresensi(activeUrl, {
           id: targetRec.id,
           rowNum: targetRec.rowNum,
           nama: targetRec.nama,
@@ -470,10 +475,11 @@ export default function App() {
 
     // Sinkronisasi update 2-arah ke Spreadsheet jika GAS terhubung
     const cfg = storageService.getGasConfig();
-    if (cfg.apiUrl) {
+    const activeUrl = cfg.apiUrl || DEFAULT_GAS_API_URL;
+    if (activeUrl) {
       const mergedRec = { ...existingRec, ...updatedRec };
       gasClient
-        .updatePresensi(cfg.apiUrl, mergedRec, existingRec?.rowNum)
+        .updatePresensi(activeUrl, mergedRec, existingRec?.rowNum)
         .catch((e) => console.warn('Gagal sinkronisasi update presensi ke Spreadsheet:', e));
     }
   };

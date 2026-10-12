@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Cloud, RefreshCw, Copy, Check, Terminal, ExternalLink, Zap } from 'lucide-react';
 import { GasConfig } from '../../types';
-import { storageService } from '../../services/storageService';
+import { storageService, DEFAULT_GAS_API_URL } from '../../services/storageService';
 import { gasClient } from '../../services/gasClient';
 import { sheetSyncService } from '../../services/sheetSync';
 import { STANDALONE_GAS_SCRIPT } from '../../data/standaloneGasScript';
@@ -22,7 +22,7 @@ export const GasCenterModal: React.FC<GasCenterModalProps> = ({
   onUpdateConfig,
   onDataSyncSuccess,
 }) => {
-  const [apiUrl, setApiUrl] = useState(config.apiUrl);
+  const [apiUrl, setApiUrl] = useState(config.apiUrl || DEFAULT_GAS_API_URL);
   const [isAutoSync, setIsAutoSync] = useState(config.isAutoSync);
   const [isTesting, setIsTesting] = useState(false);
   const [isSyncingSheet, setIsSyncingSheet] = useState(false);
@@ -215,6 +215,29 @@ export const GasCenterModal: React.FC<GasCenterModalProps> = ({
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
                   >
                     Simpan
+                  </button>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Endpoint Aktif Default: HR Karyawan Produksi I
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setApiUrl(DEFAULT_GAS_API_URL);
+                      const updated: GasConfig = {
+                        ...config,
+                        apiUrl: DEFAULT_GAS_API_URL,
+                        isAutoSync: true,
+                        status: 'connected',
+                      };
+                      storageService.saveGasConfig(updated);
+                      onUpdateConfig(updated);
+                      setTestLog('Berhasil menetapkan URL default HR Karyawan Produksi I.');
+                    }}
+                    className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+                  >
+                    Terapkan URL Default
                   </button>
                 </div>
               </div>
