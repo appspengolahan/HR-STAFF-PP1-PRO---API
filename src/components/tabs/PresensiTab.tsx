@@ -99,7 +99,15 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
         alert('URL Google Apps Script belum disetel.');
         return;
       }
-      const res = await gasClient.pushPresensi(activeUrl, rec);
+      const staff = staffList.find(
+        (s) => s.nip === rec.nip || s.nama.trim().toLowerCase() === rec.nama.trim().toLowerCase()
+      );
+      const payloadRec = {
+        ...rec,
+        jabatan: staff?.jabatan || '',
+        sekup: staff?.sekup || 'Operasional',
+      };
+      const res = await gasClient.pushPresensi(activeUrl, payloadRec as any);
       setSuccessToast(`Data ${rec.nama} (${rec.tanggal}) berhasil terkirim ke Google Spreadsheet! ${res.message || ''}`);
       if (onSyncPresensi) {
         await onSyncPresensi();
@@ -127,7 +135,15 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
       let successCount = 0;
       for (const rec of unsyncedRecords) {
         try {
-          await gasClient.pushPresensi(activeUrl, rec);
+          const staff = staffList.find(
+            (s) => s.nip === rec.nip || s.nama.trim().toLowerCase() === rec.nama.trim().toLowerCase()
+          );
+          const payloadRec = {
+            ...rec,
+            jabatan: staff?.jabatan || '',
+            sekup: staff?.sekup || 'Operasional',
+          };
+          await gasClient.pushPresensi(activeUrl, payloadRec as any);
           successCount++;
         } catch (e) {
           console.warn('Gagal push record:', rec, e);

@@ -210,27 +210,55 @@ function doGet(e) {
       const sh = ss.getSheetByName(SHEET_NAMES.PRESENSI);
       if (!sh) throw new Error("Sheet LOG_PRESENSI_IJIN tidak ditemukan");
       
-      const targetRow = getFirstEmptyRow_(sh, 6, 3);
+      let targetRow = getFirstEmptyRow_(sh, 6, 3);
+      const checkRow = targetRow - 1;
+      if (checkRow >= 6) {
+        const cVal = sh.getRange(checkRow, 3).getValue();
+        const dVal = sh.getRange(checkRow, 4).getValue();
+        const cTgl = cVal instanceof Date ? Utilities.formatDate(cVal, Session.getScriptTimeZone(), "yyyy-MM-dd") : String(cVal || "");
+        const recTgl = String(e.parameter.tanggal || "").replace(/\//g, "-");
+        if (String(dVal).trim().toLowerCase() === String(e.parameter.nama || "").trim().toLowerCase() && 
+            (cTgl === recTgl || cTgl.includes(recTgl) || recTgl.includes(cTgl))) {
+          targetRow = checkRow;
+        }
+      }
+
       let prevNo = 0;
       if (targetRow > 6) {
-        prevNo = Number(sh.getRange(targetRow - 1, 1).getValue()) || 0;
+        prevNo = Number(sh.getRange(targetRow - 1, 2).getValue()) || 0;
       }
       const nextNo = prevNo > 0 ? prevNo + 1 : (targetRow - 5);
 
+      let jabatan = e.parameter.jabatan || "";
+      let sekup = e.parameter.sekup || "Operasional";
+      if (!jabatan || jabatan === "-" || jabatan.trim() === "") {
+        const staffInfo = getStaffInfo_(ss, e.parameter.nama, e.parameter.nip);
+        jabatan = staffInfo.jabatan;
+        sekup = staffInfo.sekup || sekup;
+      }
+
+      let ketSurat = "Form Ijin";
+      const jIjin = String(e.parameter.jenisIjin || "");
+      if (jIjin.includes("Dokter")) {
+        ketSurat = "Surat Dokter";
+      } else if (jIjin.includes("Tangan") || jIjin.includes("S Tangan")) {
+        ketSurat = "Surat Tangan";
+      }
+
       const rowData = [
-        nextNo,
         "",
+        nextNo,
         e.parameter.tanggal || "",
         e.parameter.nama || "",
-        e.parameter.jabatan || "",
-        e.parameter.sekup || "Operasional",
+        jabatan,
+        sekup,
         e.parameter.jamAwal || "",
         e.parameter.jamAkhir || "",
         Number(e.parameter.durasiMenit) || 0,
         e.parameter.jenisIjin || "Hadir",
         e.parameter.keperluan || "",
         e.parameter.lampiranSurat || "Tidak",
-        e.parameter.catatan || "",
+        e.parameter.catatan || ketSurat,
         "",
         Number(e.parameter.bulan) || 10,
         Number(e.parameter.tahun) || 2026,
@@ -240,7 +268,7 @@ function doGet(e) {
       sh.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
       return jsonResponse_({
         status: "success",
-        message: "Presensi tersimpan pada baris " + targetRow,
+        message: "Presensi tersimpan pada baris " + targetRow + " (No: " + nextNo + " di kolom B)",
         rowNum: targetRow,
         noUrut: nextNo
       });
@@ -250,6 +278,29 @@ function doGet(e) {
   } catch (err) {
     return jsonResponse_({ status: "error", message: err.toString() });
   }
+}
+
+// Helper: Cari Info Staf (Jabatan & Sekup) dari MASTER_STAFF
+function getStaffInfo_(ss, nama, nip) {
+  let jabatan = "";
+  let sekup = "Operasional";
+  const shMaster = ss.getSheetByName(SHEET_NAMES.MASTER);
+  if (shMaster) {
+    const values = shMaster.getDataRange().getValues();
+    const searchNama = String(nama || "").trim().toLowerCase();
+    const searchNip = String(nip || "").trim().toLowerCase();
+    for (let r = 5; r < values.length; r++) {
+      const row = values[r];
+      const rowNama = String(row[2] || "").trim().toLowerCase();
+      const rowNip = String(row[3] || "").trim().toLowerCase();
+      if ((searchNama && rowNama === searchNama) || (searchNip && rowNip === searchNip)) {
+        jabatan = String(row[4] || "-").trim();
+        sekup = String(row[6] || "").toLowerCase().includes("admin") ? "Administrasi" : "Operasional";
+        break;
+      }
+    }
+  }
+  return { jabatan: jabatan, sekup: sekup };
 }
 
 // Helper: Cari baris pertama yang kosong di kolom C (Tanggal)
@@ -278,33 +329,83 @@ function doPost(e) {
     const action = payload.action || "save_presensi";
     const ss = getSpreadsheet_();
 
-    // Simpan Presensi & Ijin (Mencari baris kosong pertama di Kolom C/Tanggal)
+    // 1. SIMPAN PRESENSI & IJIN (Kolom B = No Urut, Kolom E = Jabatan, Kolom F = Sekup)
     if (action === "save_presensi") {
       const sh = ss.getSheetByName(SHEET_NAMES.PRESENSI);
       if (!sh) throw new Error("Sheet LOG_PRESENSI_IJIN tidak ditemukan");
-      const rec = payload.record;
+      const rec = payload.record || {};
       
-      const targetRow = getFirstEmptyRow_(sh, 6, 3);
+      let targetRow = getFirstEmptyRow_(sh, 6, 3);
+
+      // Cek apakah data ini sudah ada di baris terdekat (misal baris 369 yang perlu dirapikan nomor & jabatannya)
+      const checkRow = targetRow - 1;
+      if (checkRow >= 6) {
+        const cVal = sh.getRange(checkRow, 3).getValue();
+        const dVal = sh.getRange(checkRow, 4).getValue();
+        const cTgl = cVal instanceof Date ? Utilities.formatDate(cVal, Session.getScriptTimeZone(), "yyyy-MM-dd") : String(cVal || "");
+        const recTgl = String(rec.tanggal || "").replace(/\//g, "-");
+        if (String(dVal).trim().toLowerCase() === String(rec.nama || "").trim().toLowerCase() && 
+            (cTgl === recTgl || cTgl.includes(recTgl) || recTgl.includes(cTgl))) {
+          targetRow = checkRow; // Rapikan baris 369 langsung!
+        }
+      }
+
+      // Hitung nomor urut berikutnya dari Kolom B (index 2) baris sebelumnya
       let prevNo = 0;
       if (targetRow > 6) {
-        prevNo = Number(sh.getRange(targetRow - 1, 1).getValue()) || 0;
+        prevNo = Number(sh.getRange(targetRow - 1, 2).getValue()) || 0; // Kolom 2 = Kolom B
       }
       const nextNo = prevNo > 0 ? prevNo + 1 : (targetRow - 5);
 
+      // Ambil Jabatan & Sekup dari payload atau cari otomatis di MASTER_STAFF
+      let jabatan = rec.jabatan || "";
+      let sekup = rec.sekup || "Operasional";
+      if (!jabatan || jabatan === "-" || jabatan.trim() === "") {
+        const staffInfo = getStaffInfo_(ss, rec.nama, rec.nip);
+        jabatan = staffInfo.jabatan;
+        sekup = staffInfo.sekup || sekup;
+      }
+
+      // Keterangan kolom M (Surat Tangan / Surat Dokter / Form Ijin)
+      let ketSurat = "Form Ijin";
+      if (rec.jenisIjin && rec.jenisIjin.includes("Dokter")) {
+        ketSurat = "Surat Dokter";
+      } else if (rec.jenisIjin && (rec.jenisIjin.includes("Tangan") || rec.jenisIjin.includes("S Tangan"))) {
+        ketSurat = "Surat Tangan";
+      }
+
+      // Susun kolom A s/d Q:
+      // Kolom A: "" (Kosong)
+      // Kolom B: nextNo (Nomor Urut, misal: 364)
+      // Kolom C: rec.tanggal
+      // Kolom D: rec.nama
+      // Kolom E: jabatan (Plt. Kepala Gudang ...)
+      // Kolom F: sekup (Operasional)
+      // Kolom G: jamAwal
+      // Kolom H: jamAkhir
+      // Kolom I: durasiMenit
+      // Kolom J: jenisIjin
+      // Kolom K: keperluan
+      // Kolom L: lampiranSurat
+      // Kolom M: catatan / ketSurat
+      // Kolom N: ""
+      // Kolom O: bulan
+      // Kolom P: tahun
+      // Kolom Q: faktorPotongan
       const rowData = [
-        nextNo,
         "",
+        nextNo,
         rec.tanggal,
         rec.nama,
-        rec.jabatan || "",
-        rec.sekup || "Operasional",
+        jabatan,
+        sekup,
         rec.jamAwal || "",
         rec.jamAkhir || "",
         rec.durasiMenit || 0,
         rec.jenisIjin || "Hadir",
         rec.keperluan || "",
         rec.lampiranSurat || "Tidak",
-        rec.catatan || "",
+        rec.catatan || ketSurat,
         "",
         rec.bulan || 10,
         rec.tahun || 2026,
@@ -314,7 +415,7 @@ function doPost(e) {
       sh.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
       return jsonResponse_({
         status: "success",
-        message: "Presensi tersimpan pada baris " + targetRow,
+        message: "Presensi tersimpan pada baris " + targetRow + " (No: " + nextNo + " di kolom B)",
         rowNum: targetRow,
         noUrut: nextNo
       });

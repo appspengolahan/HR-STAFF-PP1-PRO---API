@@ -431,7 +431,15 @@ export default function App() {
     const cfg = storageService.getGasConfig();
     const activeUrl = cfg.apiUrl || DEFAULT_GAS_API_URL;
     if (activeUrl) {
-      gasClient.pushPresensi(activeUrl, rec).catch((e) => console.warn('Gagal push presensi ke GAS:', e));
+      const staff = staffList.find(
+        (s) => s.nip === rec.nip || s.nama.trim().toLowerCase() === rec.nama.trim().toLowerCase()
+      );
+      const payloadRec = {
+        ...rec,
+        jabatan: staff?.jabatan || '',
+        sekup: staff?.sekup || 'Operasional',
+      };
+      gasClient.pushPresensi(activeUrl, payloadRec as any).catch((e) => console.warn('Gagal push presensi ke GAS:', e));
     }
   };
 
@@ -443,7 +451,15 @@ export default function App() {
     const activeUrl = cfg.apiUrl || DEFAULT_GAS_API_URL;
     if (activeUrl) {
       for (const rec of records) {
-        gasClient.pushPresensi(activeUrl, rec).catch((e) => console.warn('Gagal push presensi ke GAS:', e));
+        const staff = staffList.find(
+          (s) => s.nip === rec.nip || s.nama.trim().toLowerCase() === rec.nama.trim().toLowerCase()
+        );
+        const payloadRec = {
+          ...rec,
+          jabatan: staff?.jabatan || '',
+          sekup: staff?.sekup || 'Operasional',
+        };
+        gasClient.pushPresensi(activeUrl, payloadRec as any).catch((e) => console.warn('Gagal push presensi ke GAS:', e));
       }
     }
   };

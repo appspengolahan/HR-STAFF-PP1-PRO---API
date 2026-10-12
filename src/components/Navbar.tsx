@@ -18,8 +18,6 @@ import {
   CheckCircle2,
   RefreshCw,
   FileSpreadsheet,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { AuthUser } from '../types';
 import { usePWAInstall } from '../hooks/usePWAInstall';
@@ -134,22 +132,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header
       className={`fixed ${isDevSupervisorVisible ? 'top-8' : 'top-0'} left-0 right-0 w-full h-14 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-30 transition-all duration-300 flex items-center justify-between px-3 sm:px-6 shadow-xs`}
     >
-      {/* SISI KIRI: Brand & Judul Aplikasi Lengkap Sejajar dengan Sidebar (Tidak Terciutkan Saat Mini Sidebar) */}
-      <div className="flex items-center gap-3 min-w-0 pr-2">
-        {onToggleSidebar && (
-          <button
-            onClick={onToggleSidebar}
-            className="hidden lg:flex items-center justify-center p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0 border border-slate-200/80 dark:border-slate-700/60"
-            title={sidebarCollapsed ? 'Perluas Sidebar' : 'Ciutkan Sidebar ke Mini Mode'}
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-            ) : (
-              <ChevronLeft className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-            )}
-          </button>
-        )}
-
+      {/* SISI KIRI: Brand & Judul Aplikasi Sejajar Persis dengan Menu Sidebar */}
+      <div className="flex items-center gap-3 min-w-0 pr-2 pl-0.5 sm:pl-1">
         <div
           onClick={handleLogoClick}
           className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 via-indigo-600 to-cyan-500 flex items-center justify-center text-white font-black text-xs shadow-md shadow-blue-900/20 cursor-pointer select-none active:scale-95 transition-transform shrink-0"
