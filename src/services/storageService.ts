@@ -233,10 +233,25 @@ export const storageService = {
       }
     }
 
-    // Pastikan seluruh data input manual lokal selalu disertakan paling atas (tidak pernah hilang)
+    // Rekonsiliasi: Jika data manual lokal sudah berhasil masuk ke server (baseList) dengan NIP/Nama, Tanggal & Jenis Ijin yang sama,
+    // maka draft lokal otomatis dibersihkan agar tidak terjadi data dobel.
+    const unsyncedManual = manualList.filter((m) => {
+      const alreadyInBase = baseList.some(
+        (b) =>
+          b.rowNum &&
+          (b.nip === m.nip || b.nama.trim().toLowerCase() === m.nama.trim().toLowerCase()) &&
+          (b.tanggal === m.tanggal || b.tanggal.replace(/\//g, '-') === m.tanggal.replace(/\//g, '-')) &&
+          b.jenisIjin === m.jenisIjin
+      );
+      return !alreadyInBase;
+    });
+    if (unsyncedManual.length !== manualList.length) {
+      writeStorage(KEYS.PRESENSI_MANUAL, unsyncedManual);
+    }
+
     const combined = [
-      ...manualList,
-      ...baseList.filter((b) => !manualList.some((m) => m.id === b.id)),
+      ...unsyncedManual,
+      ...baseList.filter((b) => !unsyncedManual.some((m) => m.id === b.id)),
     ];
 
     // Normalisasi durasi menit (bulatkan desimal floating point) & faktor potongan presisi
@@ -254,15 +269,26 @@ export const storageService = {
     });
   },
   savePresensiList(list: PresensiRecord[]): void {
-    // Saat sinkronisasi dari Google Sheets/GAS dijalankan, data manual lokal tetap dipertahankan
     const manualList = this.getManualPresensiList();
+    const unsyncedManual = manualList.filter((m) => {
+      const alreadyInServer = list.some(
+        (srv) =>
+          srv.rowNum &&
+          (srv.nip === m.nip || srv.nama.trim().toLowerCase() === m.nama.trim().toLowerCase()) &&
+          (srv.tanggal === m.tanggal || srv.tanggal.replace(/\//g, '-') === m.tanggal.replace(/\//g, '-')) &&
+          srv.jenisIjin === m.jenisIjin
+      );
+      return !alreadyInServer;
+    });
+    this.saveManualPresensiList(unsyncedManual);
+
     const sanitizedList = list.map((item) => ({
       ...item,
       durasiMenit: Math.round(Number(item.durasiMenit) || 0),
     }));
     const merged = [
-      ...manualList,
-      ...sanitizedList.filter((item) => !manualList.some((m) => m.id === item.id)),
+      ...unsyncedManual,
+      ...sanitizedList.filter((item) => !unsyncedManual.some((m) => m.id === item.id)),
     ];
     writeStorage(KEYS.PRESENSI, merged);
   },
