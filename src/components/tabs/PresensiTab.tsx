@@ -16,11 +16,14 @@ import {
   Check,
   RefreshCw,
   ChevronDown,
+  UploadCloud,
 } from 'lucide-react';
 import { PresensiRecord, StaffData, JenisIjin } from '../../types';
 import { NAMA_BULAN_INDO } from '../../services/payrollEngine';
 import { SuratIjinModal } from '../modals/SuratIjinModal';
 import { getNamaHariIndo, formatTanggalDmy, getTodayIsoDate } from '../../utils/dateFormatter';
+import { storageService, DEFAULT_GAS_API_URL } from '../../services/storageService';
+import { gasClient } from '../../services/gasClient';
 
 interface PresensiTabProps {
   presensiList: PresensiRecord[];
@@ -78,6 +81,68 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   const [formCatatan, setFormCatatan] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  // Sync state & unsynced records detection (Data yang baru terinput di web app tapi belum memiliki rowNum di spreadsheet)
+  const unsyncedRecords = useMemo(() => {
+    return presensiList.filter((r) => !r.rowNum);
+  }, [presensiList]);
+
+  const [isPushingRecordId, setIsPushingRecordId] = useState<string | null>(null);
+  const [isPushingAll, setIsPushingAll] = useState(false);
+
+  const handlePushSingleRecord = async (rec: PresensiRecord) => {
+    setIsPushingRecordId(rec.id);
+    try {
+      const cfg = storageService.getGasConfig();
+      const activeUrl = cfg.apiUrl || DEFAULT_GAS_API_URL;
+      if (!activeUrl) {
+        alert('URL Google Apps Script belum disetel.');
+        return;
+      }
+      const res = await gasClient.pushPresensi(activeUrl, rec);
+      setSuccessToast(`Data ${rec.nama} (${rec.tanggal}) berhasil terkirim ke Google Spreadsheet! ${res.message || ''}`);
+      if (onSyncPresensi) {
+        await onSyncPresensi();
+      }
+    } catch (err) {
+      alert(`Gagal mengirim ke Spreadsheet: ${err}`);
+    } finally {
+      setIsPushingRecordId(null);
+    }
+  };
+
+  const handlePushAllUnsynced = async () => {
+    if (unsyncedRecords.length === 0) {
+      alert('Semua data presensi sudah tersinkronisasi dengan Spreadsheet.');
+      return;
+    }
+    setIsPushingAll(true);
+    try {
+      const cfg = storageService.getGasConfig();
+      const activeUrl = cfg.apiUrl || DEFAULT_GAS_API_URL;
+      if (!activeUrl) {
+        alert('URL Google Apps Script belum disetel.');
+        return;
+      }
+      let successCount = 0;
+      for (const rec of unsyncedRecords) {
+        try {
+          await gasClient.pushPresensi(activeUrl, rec);
+          successCount++;
+        } catch (e) {
+          console.warn('Gagal push record:', rec, e);
+        }
+      }
+      setSuccessToast(`Berhasil mengirim ${successCount} data ke Google Spreadsheet!`);
+      if (onSyncPresensi) {
+        await onSyncPresensi();
+      }
+    } catch (err) {
+      alert(`Terjadi kesalahan saat sync data lokal: ${err}`);
+    } finally {
+      setIsPushingAll(false);
+    }
+  };
 
   // Searchable Staff Combobox (Mode Saran - Hanya Nama)
   const [staffSearchQuery, setStaffSearchQuery] = useState('');
@@ -619,6 +684,17 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {unsyncedRecords.length > 0 && (
+              <button
+                onClick={handlePushAllUnsynced}
+                disabled={isPushingAll}
+                title="Kirim semua data presensi yang baru diinput di web apps ke Google Spreadsheet tujuan"
+                className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              >
+                <UploadCloud className={`w-4 h-4 ${isPushingAll ? 'animate-spin' : ''}`} />
+                {isPushingAll ? 'Mengirim...' : `Kirim ke Sheet (${unsyncedRecords.length})`}
+              </button>
+            )}
             {onSyncPresensi && (
               <button
                 onClick={() => onSyncPresensi()}
@@ -747,6 +823,17 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                       </td>
                       <td className="py-3 px-4 text-right no-print">
                         <div className="flex items-center justify-end gap-1.5">
+                          {!row.rowNum && (
+                            <button
+                              onClick={() => handlePushSingleRecord(row)}
+                              disabled={isPushingRecordId === row.id}
+                              title="Data ini baru tersimpan di Web Apps. Klik untuk langsung mengirimkannya ke Google Spreadsheet tujuan."
+                              className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                            >
+                              <UploadCloud className={`w-3.5 h-3.5 ${isPushingRecordId === row.id ? 'animate-spin' : ''}`} />
+                              <span>{isPushingRecordId === row.id ? 'Mengirim...' : 'Kirim ke Sheet'}</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => handleOpenEditModal(row)}
                             title="Edit Data Presensi & Ijin"

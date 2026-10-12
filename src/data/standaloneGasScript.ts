@@ -205,10 +205,68 @@ function doGet(e) {
       return jsonResponse_({ status: "success", count: list.length, data: list });
     }
 
+    // 4. SIMPAN PRESENSI VIA GET (Fallback Fail-Safe jika browser terhalang redirect POST)
+    if (action === "save_presensi") {
+      const sh = ss.getSheetByName(SHEET_NAMES.PRESENSI);
+      if (!sh) throw new Error("Sheet LOG_PRESENSI_IJIN tidak ditemukan");
+      
+      const targetRow = getFirstEmptyRow_(sh, 6, 3);
+      let prevNo = 0;
+      if (targetRow > 6) {
+        prevNo = Number(sh.getRange(targetRow - 1, 1).getValue()) || 0;
+      }
+      const nextNo = prevNo > 0 ? prevNo + 1 : (targetRow - 5);
+
+      const rowData = [
+        nextNo,
+        "",
+        e.parameter.tanggal || "",
+        e.parameter.nama || "",
+        e.parameter.jabatan || "",
+        e.parameter.sekup || "Operasional",
+        e.parameter.jamAwal || "",
+        e.parameter.jamAkhir || "",
+        Number(e.parameter.durasiMenit) || 0,
+        e.parameter.jenisIjin || "Hadir",
+        e.parameter.keperluan || "",
+        e.parameter.lampiranSurat || "Tidak",
+        e.parameter.catatan || "",
+        "",
+        Number(e.parameter.bulan) || 10,
+        Number(e.parameter.tahun) || 2026,
+        Number(e.parameter.faktorPotongan) || 0
+      ];
+
+      sh.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
+      return jsonResponse_({
+        status: "success",
+        message: "Presensi tersimpan pada baris " + targetRow,
+        rowNum: targetRow,
+        noUrut: nextNo
+      });
+    }
+
     return jsonResponse_({ status: "error", message: "Aksi tidak dikenal: " + action });
   } catch (err) {
     return jsonResponse_({ status: "error", message: err.toString() });
   }
+}
+
+// Helper: Cari baris pertama yang kosong di kolom C (Tanggal)
+function getFirstEmptyRow_(sheet, startRow, checkCol) {
+  startRow = startRow || 6;
+  checkCol = checkCol || 3;
+  const maxRows = sheet.getMaxRows();
+  const numRows = Math.min(maxRows - startRow + 1, 5000);
+  if (numRows <= 0) return startRow;
+  const values = sheet.getRange(startRow, checkCol, numRows, 1).getValues();
+  for (let i = 0; i < values.length; i++) {
+    const val = values[i][0];
+    if (val === "" || val === null || val === undefined || String(val).trim() === "") {
+      return startRow + i;
+    }
+  }
+  return startRow + numRows;
 }
 
 function doPost(e) {
@@ -220,13 +278,22 @@ function doPost(e) {
     const action = payload.action || "save_presensi";
     const ss = getSpreadsheet_();
 
-    // Simpan Presensi & Ijin
+    // Simpan Presensi & Ijin (Mencari baris kosong pertama di Kolom C/Tanggal)
     if (action === "save_presensi") {
       const sh = ss.getSheetByName(SHEET_NAMES.PRESENSI);
       if (!sh) throw new Error("Sheet LOG_PRESENSI_IJIN tidak ditemukan");
       const rec = payload.record;
-      sh.appendRow([
-        "", "",
+      
+      const targetRow = getFirstEmptyRow_(sh, 6, 3);
+      let prevNo = 0;
+      if (targetRow > 6) {
+        prevNo = Number(sh.getRange(targetRow - 1, 1).getValue()) || 0;
+      }
+      const nextNo = prevNo > 0 ? prevNo + 1 : (targetRow - 5);
+
+      const rowData = [
+        nextNo,
+        "",
         rec.tanggal,
         rec.nama,
         rec.jabatan || "",
@@ -238,10 +305,19 @@ function doPost(e) {
         rec.keperluan || "",
         rec.lampiranSurat || "Tidak",
         rec.catatan || "",
-        "", rec.bulan || 10, rec.tahun || 2026,
+        "",
+        rec.bulan || 10,
+        rec.tahun || 2026,
         rec.faktorPotongan || 0
-      ]);
-      return jsonResponse_({ status: "success", message: "Presensi tersimpan di GAS V3 Standalone" });
+      ];
+
+      sh.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
+      return jsonResponse_({
+        status: "success",
+        message: "Presensi tersimpan pada baris " + targetRow,
+        rowNum: targetRow,
+        noUrut: nextNo
+      });
     }
 
     // Simpan Lembur SPKL
