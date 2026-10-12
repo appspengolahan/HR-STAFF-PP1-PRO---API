@@ -723,7 +723,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                       <td className="py-3 px-4">
                         {row.jamAwal && row.jamAkhir ? (
                           <span>
-                            {row.jamAwal} – {row.jamAkhir} ({row.durasiMenit}m)
+                            {row.jamAwal} – {row.jamAkhir} ({Math.round(Number(row.durasiMenit) || 0)}m)
                           </span>
                         ) : (
                           <span className="text-slate-400 italic">Sehari penuh</span>

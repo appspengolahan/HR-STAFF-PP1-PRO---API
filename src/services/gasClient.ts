@@ -147,7 +147,20 @@ export const gasClient = {
       const st = staffList?.find((s) => s.nama.toLowerCase() === nama.toLowerCase());
       const nip = st?.nip || r.nip || `BK-PP1-${String((rowNum % 1000)).padStart(3, '0')}`;
 
-      const durasiMenit = Number(r.durasiMenit) || 0;
+      const jamAwal = cleanGasTime(r.jamAwal, '08:00');
+      const jamAkhir = cleanGasTime(r.jamAkhir, '15:00');
+
+      let durasiMenit = Math.round(Number(r.durasiMenit) || 0);
+      // Jika durasi 0 tetapi jamAwal dan jamAkhir terisi dengan benar, hitung selisihnya
+      if (durasiMenit <= 0 && jamAwal && jamAkhir && jamAwal !== jamAkhir) {
+        const [h1, m1] = jamAwal.split(':').map(Number);
+        const [h2, m2] = jamAkhir.split(':').map(Number);
+        if (!isNaN(h1) && !isNaN(m1) && !isNaN(h2) && !isNaN(m2)) {
+          const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+          if (diff > 0) durasiMenit = diff;
+        }
+      }
+
       const jenisIjin = (r.jenisIjin || 'Hadir') as JenisIjin;
       const lampiranSurat =
         (r.lampiranSurat || r.lampiran || 'Tidak') === 'Ya' ? 'Ya' : 'Tidak';
@@ -168,8 +181,8 @@ export const gasClient = {
         hari,
         nip,
         nama,
-        jamAwal: cleanGasTime(r.jamAwal, '08:00'),
-        jamAkhir: cleanGasTime(r.jamAkhir, '15:00'),
+        jamAwal,
+        jamAkhir,
         durasiMenit,
         jenisIjin,
         faktorPotongan,

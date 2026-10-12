@@ -239,55 +239,78 @@ export const storageService = {
       ...baseList.filter((b) => !manualList.some((m) => m.id === b.id)),
     ];
 
-    // Normalisasi faktor potongan presisi (agar data presensi sinkron lama otomatis ter-update)
+    // Normalisasi durasi menit (bulatkan desimal floating point) & faktor potongan presisi
     return combined.map((p) => {
-      const eff = getEffectiveFaktorPotongan(p);
-      if (eff > 0 && (p.faktorPotongan === 0 || p.faktorPotongan === undefined)) {
-        return { ...p, faktorPotongan: eff };
+      const durasiMenit = Math.round(Number(p.durasiMenit) || 0);
+      const cleanP: PresensiRecord = {
+        ...p,
+        durasiMenit,
+      };
+      const eff = getEffectiveFaktorPotongan(cleanP);
+      if (eff > 0 && (cleanP.faktorPotongan === 0 || cleanP.faktorPotongan === undefined)) {
+        return { ...cleanP, faktorPotongan: eff };
       }
-      return p;
+      return cleanP;
     });
   },
   savePresensiList(list: PresensiRecord[]): void {
     // Saat sinkronisasi dari Google Sheets/GAS dijalankan, data manual lokal tetap dipertahankan
     const manualList = this.getManualPresensiList();
+    const sanitizedList = list.map((item) => ({
+      ...item,
+      durasiMenit: Math.round(Number(item.durasiMenit) || 0),
+    }));
     const merged = [
       ...manualList,
-      ...list.filter((item) => !manualList.some((m) => m.id === item.id)),
+      ...sanitizedList.filter((item) => !manualList.some((m) => m.id === item.id)),
     ];
     writeStorage(KEYS.PRESENSI, merged);
   },
   addPresensi(rec: PresensiRecord): void {
+    const cleanRec: PresensiRecord = {
+      ...rec,
+      durasiMenit: Math.round(Number(rec.durasiMenit) || 0),
+    };
     const manual = this.getManualPresensiList();
-    const updatedManual = [rec, ...manual.filter((m) => m.id !== rec.id)];
+    const updatedManual = [cleanRec, ...manual.filter((m) => m.id !== cleanRec.id)];
     this.saveManualPresensiList(updatedManual);
 
     const list = this.getPresensiList();
-    const updatedList = [rec, ...list.filter((l) => l.id !== rec.id)];
+    const updatedList = [cleanRec, ...list.filter((l) => l.id !== cleanRec.id)];
     writeStorage(KEYS.PRESENSI, updatedList);
   },
   addPresensiBatch(records: PresensiRecord[]): void {
+    const cleanRecords = records.map((r) => ({
+      ...r,
+      durasiMenit: Math.round(Number(r.durasiMenit) || 0),
+    }));
     const manual = this.getManualPresensiList();
-    const recordIds = new Set(records.map((r) => r.id));
-    const updatedManual = [...records, ...manual.filter((m) => !recordIds.has(m.id))];
+    const recordIds = new Set(cleanRecords.map((r) => r.id));
+    const updatedManual = [...cleanRecords, ...manual.filter((m) => !recordIds.has(m.id))];
     this.saveManualPresensiList(updatedManual);
 
     const list = this.getPresensiList();
-    const updatedList = [...records, ...list.filter((l) => !recordIds.has(l.id))];
+    const updatedList = [...cleanRecords, ...list.filter((l) => !recordIds.has(l.id))];
     writeStorage(KEYS.PRESENSI, updatedList);
   },
   updatePresensi(id: string, updatedRec: Partial<PresensiRecord>): void {
+    const cleanUpdated: Partial<PresensiRecord> = {
+      ...updatedRec,
+      ...(updatedRec.durasiMenit !== undefined
+        ? { durasiMenit: Math.round(Number(updatedRec.durasiMenit) || 0) }
+        : {}),
+    };
     const manual = this.getManualPresensiList();
     const mIdx = manual.findIndex((m) => m.id === id);
     if (mIdx !== -1) {
-      manual[mIdx] = { ...manual[mIdx], ...updatedRec };
+      manual[mIdx] = { ...manual[mIdx], ...cleanUpdated };
       this.saveManualPresensiList(manual);
     }
 
     const list = this.getPresensiList();
     const idx = list.findIndex((p) => p.id === id);
     if (idx !== -1) {
-      list[idx] = { ...list[idx], ...updatedRec };
+      list[idx] = { ...list[idx], ...cleanUpdated };
       writeStorage(KEYS.PRESENSI, list);
     }
   },

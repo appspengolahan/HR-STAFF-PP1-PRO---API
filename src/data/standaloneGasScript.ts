@@ -191,7 +191,7 @@ function doGet(e) {
             nama: String(row[3]).trim(),
             jamAwal: String(row[6] || "").trim(),
             jamAkhir: String(row[7] || "").trim(),
-            durasiMenit: Number(row[8]) || 0,
+            durasiMenit: Math.round(Number(row[8]) || 0),
             jenisIjin: String(row[9] || "Hadir").trim(),
             keperluan: String(row[10] || "").trim(),
             lampiranSurat: String(row[11] || "Tidak").trim(),
