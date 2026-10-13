@@ -426,7 +426,7 @@ export default function App() {
   };
 
   // Handlers for Presensi
-  const handleAddPresensi = (rec: PresensiRecord) => {
+  const handleAddPresensi = async (rec: PresensiRecord) => {
     storageService.addPresensi(rec);
     setPresensiList(storageService.getPresensiList());
 
@@ -441,28 +441,58 @@ export default function App() {
         jabatan: staff?.jabatan || '',
         sekup: staff?.sekup || 'Operasional',
       };
-      gasClient.pushPresensi(activeUrl, payloadRec as any).catch((e) => console.warn('Gagal push presensi ke GAS:', e));
+      try {
+        const res = await gasClient.pushPresensi(activeUrl, payloadRec as any);
+        if (res.rowNum) {
+          storageService.updatePresensi(rec.id, { rowNum: res.rowNum });
+          setPresensiList(storageService.getPresensiList());
+        }
+        setTimeout(() => {
+          handleSyncPresensiLive(true);
+        }, 1500);
+      } catch (e) {
+        console.warn('Gagal push presensi ke GAS:', e);
+      }
     }
   };
 
-  const handleAddPresensiBatch = (records: PresensiRecord[]) => {
+  const handleAddPresensiBatch = async (records: PresensiRecord[]) => {
     storageService.addPresensiBatch(records);
     setPresensiList(storageService.getPresensiList());
 
     const cfg = storageService.getGasConfig();
     const activeUrl = cfg.apiUrl || DEFAULT_GAS_API_URL;
     if (activeUrl) {
-      for (const rec of records) {
-        const staff = staffList.find(
-          (s) => s.nip === rec.nip || s.nama.trim().toLowerCase() === rec.nama.trim().toLowerCase()
-        );
-        const payloadRec = {
-          ...rec,
-          jabatan: staff?.jabatan || '',
-          sekup: staff?.sekup || 'Operasional',
-        };
-        gasClient.pushPresensi(activeUrl, payloadRec as any).catch((e) => console.warn('Gagal push presensi ke GAS:', e));
-      }
+      // Kirim data multi-hari secara berurutan (sequential) dengan jeda aman 800ms
+      // agar Google Spreadsheet tidak mengalami tabrakan konkurensi (race condition)
+      (async () => {
+        for (let i = 0; i < records.length; i++) {
+          const rec = records[i];
+          const staff = staffList.find(
+            (s) => s.nip === rec.nip || s.nama.trim().toLowerCase() === rec.nama.trim().toLowerCase()
+          );
+          const payloadRec = {
+            ...rec,
+            jabatan: staff?.jabatan || '',
+            sekup: staff?.sekup || 'Operasional',
+          };
+          try {
+            const res = await gasClient.pushPresensi(activeUrl, payloadRec as any);
+            if (res.rowNum) {
+              storageService.updatePresensi(rec.id, { rowNum: res.rowNum });
+              setPresensiList(storageService.getPresensiList());
+            }
+            if (i < records.length - 1) {
+              await new Promise((resolve) => setTimeout(resolve, 1200));
+            }
+          } catch (e) {
+            console.warn(`Gagal push presensi tanggal ${rec.tanggal} ke GAS:`, e);
+          }
+        }
+        setTimeout(() => {
+          handleSyncPresensiLive(true);
+        }, 2500);
+      })();
     }
   };
 

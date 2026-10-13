@@ -2,6 +2,7 @@ import { StaffData, PresensiRecord, LinkArsip, LemburRecord } from '../types';
 import { storageService } from './storageService';
 import { gasClient } from './gasClient';
 import { getEffectiveFaktorPotongan } from './payrollEngine';
+import { normalizeIsoDate, parseDateFlexible } from '../utils/dateFormatter';
 
 const SPREADSHEET_ID = '1KzEFolz_sE2bhUPTn2U2NWWPAgs3V9fpatYc7t1aGs0';
 
@@ -219,24 +220,10 @@ export const sheetSyncService = {
           const lampiranSurat = ((r[11] || '').toLowerCase().includes('ya') ? 'Ya' : 'Tidak') as any;
           const catatan = (r[12] || '').replace(/^"|"$/g, '').trim();
 
-          let isoTgl = rawTgl;
-          let bulan = 10;
-          let tahun = 2026;
-          if (rawTgl.includes('/')) {
-            const p = rawTgl.split('/');
-            if (p.length === 3) {
-              isoTgl = `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
-              bulan = parseInt(p[1], 10);
-              tahun = parseInt(p[2], 10);
-            }
-          } else if (rawTgl.includes('-')) {
-            const p = rawTgl.split('-');
-            if (p.length === 3) {
-              isoTgl = rawTgl;
-              tahun = parseInt(p[0], 10);
-              bulan = parseInt(p[1], 10);
-            }
-          }
+          const parsedDt = parseDateFlexible(rawTgl);
+          const isoTgl = normalizeIsoDate(rawTgl) || rawTgl;
+          const bulan = parsedDt ? parsedDt.getMonth() + 1 : 10;
+          const tahun = parsedDt ? parsedDt.getFullYear() : 2026;
 
           const rawFaktor = (r[16] || '').replace(',', '.').replace(/^"|"$/g, '').trim();
           const parsedFaktor = rawFaktor !== '' && !isNaN(parseFloat(rawFaktor)) ? parseFloat(rawFaktor) : undefined;
@@ -250,12 +237,9 @@ export const sheetSyncService = {
 
           const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
           let hariName = 'Hari';
-          try {
-            const dt = new Date(isoTgl);
-            if (!isNaN(dt.getTime())) {
-              hariName = dayNames[dt.getDay()];
-            }
-          } catch (_) {}
+          if (parsedDt && !isNaN(parsedDt.getTime())) {
+            hariName = dayNames[parsedDt.getDay()];
+          }
 
           const st = allStaff.find((s) => s.nama.toLowerCase() === nama.toLowerCase());
 

@@ -90,6 +90,20 @@ export function parseDateFlexible(val?: string | Date | null): Date | null {
 }
 
 /**
+ * Normalize any date representation to standard ISO string (YYYY-MM-DD)
+ * Handles "13/10/2026", "13-10-2026", "2026-10-13", Date instances, etc.
+ */
+export function normalizeIsoDate(val?: string | Date | null): string {
+  const dt = parseDateFlexible(val);
+  if (!dt) return typeof val === 'string' ? val.trim() : '';
+
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
  * Format date in numeric Indonesian format: DD/MM/YYYY
  * Example: 06/10/2026
  */

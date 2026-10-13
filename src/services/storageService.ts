@@ -23,7 +23,7 @@ import {
   INITIAL_STAFF_LIST,
 } from '../data/initialData';
 import { getEffectiveFaktorPotongan } from './payrollEngine';
-import { formatWaktuWib } from '../utils/dateFormatter';
+import { formatWaktuWib, normalizeIsoDate } from '../utils/dateFormatter';
 
 export interface ColumnVisibilitySettings {
   showGajiPokok: boolean;
@@ -169,6 +169,12 @@ export const storageService = {
     const hasDedikOct9 =
       (manualList && manualList.some((p) => p.nip === 'BK-PP1-017' && (p.tanggal === '2026-10-09' || p.tanggal === '09/10/2026'))) ||
       (list && list.some((p) => p.nip === 'BK-PP1-017' && (p.tanggal === '2026-10-09' || p.tanggal === '09/10/2026')));
+    const hasDedikOct12 =
+      (manualList && manualList.some((p) => p.nip === 'BK-PP1-017' && (p.tanggal === '2026-10-12' || p.tanggal === '12/10/2026'))) ||
+      (list && list.some((p) => p.nip === 'BK-PP1-017' && (p.tanggal === '2026-10-12' || p.tanggal === '12/10/2026')));
+    const hasDedikOct13 =
+      (manualList && manualList.some((p) => p.nip === 'BK-PP1-017' && (p.tanggal === '2026-10-13' || p.tanggal === '13/10/2026'))) ||
+      (list && list.some((p) => p.nip === 'BK-PP1-017' && (p.tanggal === '2026-10-13' || p.tanggal === '13/10/2026')));
 
     const hasSumiati = list && list.some((p) => p.nama.toUpperCase().includes('SUMIATI'));
     const baseList = (!list || list.length < 358 || !hasMatsukriOct7 || hasSumiati)
@@ -182,6 +188,24 @@ export const storageService = {
       );
       if (dedikRec && !manualList.some((m) => m.id === dedikRec.id)) {
         manualList.unshift(dedikRec);
+        writeStorage(KEYS.PRESENSI_MANUAL, manualList);
+      }
+    }
+    if (!hasDedikOct12) {
+      const dedikRec12 = INITIAL_PRESENSI_LIST.find(
+        (p) => p.nip === 'BK-PP1-017' && p.tanggal === '2026-10-12'
+      );
+      if (dedikRec12 && !manualList.some((m) => m.id === dedikRec12.id)) {
+        manualList.unshift(dedikRec12);
+        writeStorage(KEYS.PRESENSI_MANUAL, manualList);
+      }
+    }
+    if (!hasDedikOct13) {
+      const dedikRec13 = INITIAL_PRESENSI_LIST.find(
+        (p) => p.nip === 'BK-PP1-017' && p.tanggal === '2026-10-13'
+      );
+      if (dedikRec13 && !manualList.some((m) => m.id === dedikRec13.id)) {
+        manualList.unshift(dedikRec13);
         writeStorage(KEYS.PRESENSI_MANUAL, manualList);
       }
     } else {
@@ -236,11 +260,12 @@ export const storageService = {
     // Rekonsiliasi: Jika data manual lokal sudah berhasil masuk ke server (baseList) dengan NIP/Nama, Tanggal & Jenis Ijin yang sama,
     // maka draft lokal otomatis dibersihkan agar tidak terjadi data dobel.
     const unsyncedManual = manualList.filter((m) => {
+      const mDate = normalizeIsoDate(m.tanggal);
       const alreadyInBase = baseList.some(
         (b) =>
           b.rowNum &&
           (b.nip === m.nip || b.nama.trim().toLowerCase() === m.nama.trim().toLowerCase()) &&
-          (b.tanggal === m.tanggal || b.tanggal.replace(/\//g, '-') === m.tanggal.replace(/\//g, '-')) &&
+          normalizeIsoDate(b.tanggal) === mDate &&
           b.jenisIjin === m.jenisIjin
       );
       return !alreadyInBase;
@@ -271,11 +296,12 @@ export const storageService = {
   savePresensiList(list: PresensiRecord[]): void {
     const manualList = this.getManualPresensiList();
     const unsyncedManual = manualList.filter((m) => {
+      const mDate = normalizeIsoDate(m.tanggal);
       const alreadyInServer = list.some(
         (srv) =>
           srv.rowNum &&
           (srv.nip === m.nip || srv.nama.trim().toLowerCase() === m.nama.trim().toLowerCase()) &&
-          (srv.tanggal === m.tanggal || srv.tanggal.replace(/\//g, '-') === m.tanggal.replace(/\//g, '-')) &&
+          normalizeIsoDate(srv.tanggal) === mDate &&
           srv.jenisIjin === m.jenisIjin
       );
       return !alreadyInServer;

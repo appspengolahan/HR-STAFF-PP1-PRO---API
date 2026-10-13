@@ -1,11 +1,14 @@
 import { PresensiRecord, LemburRecord, StaffData, JenisIjin } from '../types';
 import { getEffectiveFaktorPotongan } from './payrollEngine';
+import { normalizeIsoDate, parseDateFlexible } from '../utils/dateFormatter';
 
 export interface GasResponse<T = unknown> {
   status: 'success' | 'error';
   message?: string;
   data?: T;
   count?: number;
+  rowNum?: number;
+  noUrut?: number;
   timestamp?: string;
 }
 
@@ -115,33 +118,15 @@ export const gasClient = {
     const records: PresensiRecord[] = rawList.map((r, idx) => {
       const rowNum = Number(r.rowNum) || idx + 1;
       const rawTgl = String(r.tanggalIso || r.tanggal || '').trim();
-      let isoDate = rawTgl;
-      let bulan = 10;
-      let tahun = 2026;
-
-      if (rawTgl.includes('-')) {
-        const p = rawTgl.split('-');
-        if (p.length === 3) {
-          tahun = parseInt(p[0], 10);
-          bulan = parseInt(p[1], 10);
-          isoDate = rawTgl;
-        }
-      } else if (rawTgl.includes('/')) {
-        const p = rawTgl.split('/');
-        if (p.length === 3) {
-          isoDate = `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
-          bulan = parseInt(p[1], 10);
-          tahun = parseInt(p[2], 10);
-        }
-      }
+      const parsedDt = parseDateFlexible(rawTgl);
+      const isoDate = normalizeIsoDate(rawTgl) || rawTgl;
+      const bulan = parsedDt ? parsedDt.getMonth() + 1 : (Number(r.bulan) || 10);
+      const tahun = parsedDt ? parsedDt.getFullYear() : (Number(r.tahun) || 2026);
 
       let hari = 'Hari';
-      try {
-        const dt = new Date(isoDate);
-        if (!isNaN(dt.getTime())) {
-          hari = INDO_DAYS[dt.getDay()];
-        }
-      } catch (_) {}
+      if (parsedDt && !isNaN(parsedDt.getTime())) {
+        hari = INDO_DAYS[parsedDt.getDay()];
+      }
 
       const nama = String(r.nama || '').trim();
       const st = staffList?.find((s) => s.nama.toLowerCase() === nama.toLowerCase());

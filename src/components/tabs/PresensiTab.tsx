@@ -109,6 +109,12 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
         sekup: staff?.sekup || 'Operasional',
       };
       const res = await gasClient.pushPresensi(activeUrl, payloadRec as any);
+      if (res.rowNum) {
+        storageService.updatePresensi(rec.id, { rowNum: res.rowNum });
+        if (onUpdatePresensi) {
+          onUpdatePresensi(rec.id, { rowNum: res.rowNum });
+        }
+      }
       setSuccessToast(`Data ${rec.nama} (${rec.tanggal}) berhasil terkirim ke Google Spreadsheet! ${res.message || ''}`);
       if (onSyncPresensi) {
         await onSyncPresensi();
@@ -144,8 +150,12 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
             jabatan: staff?.jabatan || '',
             sekup: staff?.sekup || 'Operasional',
           };
-          await gasClient.pushPresensi(activeUrl, payloadRec as any);
+          const res = await gasClient.pushPresensi(activeUrl, payloadRec as any);
+          if (res.rowNum) {
+            storageService.updatePresensi(rec.id, { rowNum: res.rowNum });
+          }
           successCount++;
+          await new Promise((r) => setTimeout(r, 600));
         } catch (e) {
           console.warn('Gagal push record:', rec, e);
         }
@@ -575,6 +585,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
 
     // Auto-update filter table to match record so user immediately sees it
     const firstRec = recordsToAdd[0];
+    const lastRec = recordsToAdd[recordsToAdd.length - 1];
     if (firstRec) {
       setFilterBulan(firstRec.bulan);
       setFilterTahun(firstRec.tahun);
@@ -582,9 +593,12 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
       setSearchQuery('');
     }
 
-    setSuccessToast(
-      `✓ Data ijin ${st.nama} (${firstRec.jenisIjin}) tanggal ${formatTanggalDisplay(firstRec.tanggal)} berhasil disimpan dan tercatat permanen!`
-    );
+    const toastMsg =
+      recordsToAdd.length > 1
+        ? `✓ Data ijin ${st.nama} (${firstRec.jenisIjin}) untuk ${recordsToAdd.length} hari kerja (${formatTanggalDisplay(firstRec.tanggal)} s/d ${formatTanggalDisplay(lastRec.tanggal)}) berhasil disimpan di web apps!`
+        : `✓ Data ijin ${st.nama} (${firstRec.jenisIjin}) tanggal ${formatTanggalDisplay(firstRec.tanggal)} berhasil disimpan di web apps!`;
+
+    setSuccessToast(toastMsg);
 
     setIsFormOpen(false);
     // Reset form
@@ -756,6 +770,25 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
             <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/60 px-2.5 py-0.5 rounded-full shrink-0">
               {filteredList.length} Catatan
             </span>
+          </div>
+        )}
+
+        {/* Unsynced Banner Information */}
+        {unsyncedRecords.length > 0 && (
+          <div className="px-5 py-2.5 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900/40 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-800 dark:text-amber-200 no-print">
+            <div className="flex items-center gap-2">
+              <UploadCloud className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>{unsyncedRecords.length} Data Baru Tersimpan di Web Apps:</strong> Tombol <em>"Kirim ke Sheet"</em> menandakan data sudah aman di sistem web apps dan siap/sedang disinkronkan ke Google Spreadsheet.
+              </span>
+            </div>
+            <button
+              onClick={handlePushAllUnsynced}
+              disabled={isPushingAll}
+              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+            >
+              {isPushingAll ? 'Mengirim...' : 'Kirim Semua ke Sheet Sekarang'}
+            </button>
           </div>
         )}
 
