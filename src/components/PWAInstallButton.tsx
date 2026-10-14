@@ -57,7 +57,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'n
             </div>
             <div className="text-left min-w-0">
               <div className="text-xs font-bold leading-tight flex items-center gap-1.5 truncate">
-                <span>Pasang Aplikasi HR PP1</span>
+                <span>Pasang HR STAFF - PRODUKSI I</span>
                 <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-cyan-400 text-blue-950">
                   1-Klik
                 </span>
@@ -131,7 +131,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'n
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                    Pasang Aplikasi HR PP1
+                    Pasang HR STAFF - PRODUKSI I
                   </h3>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">
                     PT Batu Karang — Divisi Produksi I

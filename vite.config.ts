@@ -14,10 +14,10 @@ export default defineConfig(() => {
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
           id: '/',
-          name: 'Sistem HR Staff & Karyawan — PT Batu Karang',
-          short_name: 'HR Pekerja',
+          name: 'HR STAFF - PRODUKSI I',
+          short_name: 'HR STAFF I',
           description:
-            'Sistem manajemen kepegawaian modern untuk Staf Kantor, Karyawan Tetap, dan Kontrak Bulanan PT Batu Karang.',
+            'Sistem manajemen kepegawaian modern untuk Staf Kantor, Karyawan Tetap, dan Kontrak Bulanan PT Batu Karang Divisi Produksi I.',
           theme_color: '#0f172a',
           background_color: '#0f172a',
           display: 'standalone',

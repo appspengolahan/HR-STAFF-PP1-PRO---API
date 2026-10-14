@@ -145,7 +145,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="leading-tight truncate min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="font-extrabold text-sm sm:text-base tracking-wide text-slate-900 dark:text-white truncate">
-              PT BATU KARANG
+              HR STAFF - PRODUKSI I
             </h1>
             <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-500/20 shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -153,7 +153,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </span>
           </div>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-            HR Staff &amp; Karyawan — Divisi Produksi I (PP1)
+            PT Batu Karang — Divisi Produksi I (PP1)
           </p>
         </div>
       </div>
