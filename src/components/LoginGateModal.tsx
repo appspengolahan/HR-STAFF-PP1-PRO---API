@@ -9,6 +9,7 @@ import {
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
+  Globe,
 } from 'lucide-react';
 import { AuthUser, StaffData, UserRole } from '../types';
 
@@ -19,6 +20,7 @@ interface LoginGateModalProps {
   secretDoorTriggered: boolean;
   onCloseSecretDoorTrigger: () => void;
   onUnlockDeveloperMode: () => void;
+  onOpenPublicPortal?: () => void;
 }
 
 export const LoginGateModal: React.FC<LoginGateModalProps> = ({
@@ -28,6 +30,7 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
   secretDoorTriggered,
   onCloseSecretDoorTrigger,
   onUnlockDeveloperMode,
+  onOpenPublicPortal,
 }) => {
   const [activeGate, setActiveGate] = useState<'management' | 'staff'>('management');
 
@@ -383,6 +386,20 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
                 </form>
               )}
             </div>
+
+            {/* Tombol Akses Tamu / Linktree Publik */}
+            {onOpenPublicPortal && (
+              <div className="px-6 pb-4">
+                <button
+                  type="button"
+                  onClick={onOpenPublicPortal}
+                  className="w-full py-2.5 px-4 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all group cursor-pointer"
+                >
+                  <Globe className="w-4 h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+                  <span>🌐 Buka Portal Informasi Publik (Linktree / Tamu) ↗</span>
+                </button>
+              </div>
+            )}
 
             {/* Footer */}
             <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-center text-[10px] text-slate-500">

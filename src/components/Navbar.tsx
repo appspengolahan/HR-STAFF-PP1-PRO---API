@@ -21,6 +21,7 @@ import {
   Sparkles,
   ShieldCheck,
   UserCheck,
+  Globe,
 } from 'lucide-react';
 import { AuthUser, AppBrandingSettings, UserRole } from '../types';
 import { usePWAInstall } from '../hooks/usePWAInstall';
@@ -49,6 +50,7 @@ interface NavbarProps {
   onOpenColumnSettings?: () => void;
   branding?: AppBrandingSettings;
   onOpenBrandCustomizer?: () => void;
+  onOpenPublicShare?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -74,6 +76,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenColumnSettings,
   branding,
   onOpenBrandCustomizer,
+  onOpenPublicShare,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
@@ -260,6 +263,21 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Moon className="w-4 h-4 text-slate-600" />
           )}
         </button>
+
+        {/* Tombol Bagikan Portal Publik (Linktree) */}
+        {onOpenPublicShare && (
+          <button
+            onClick={onOpenPublicShare}
+            title="Buka &amp; Salin tautan Portal Informasi Publik (Linktree)"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 transition-all cursor-pointer select-none text-xs font-semibold shadow-xs"
+          >
+            <Globe className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="hidden lg:inline-block">Portal Publik</span>
+            <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-emerald-200/80 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">
+              Linktree
+            </span>
+          </button>
+        )}
 
         {/* SATU TOGGLE DROPDOWN TERPADU: PUSAT KONTROL & PROFIL */}
         <div className="relative" ref={dropdownRef}>
@@ -512,6 +530,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                     <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-100 text-pink-700 dark:bg-pink-950/60 dark:text-pink-300">
                       Logo
+                    </span>
+                  </button>
+                )}
+
+                {onOpenPublicShare && (
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onOpenPublicShare();
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors text-left cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                        <Globe className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-xs">Portal Publik (Linktree)</div>
+                        <div className="text-[10px] text-slate-400">Bagikan Tautan Tamu Tanpa Login</div>
+                      </div>
+                    </div>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                      Linktree
                     </span>
                   </button>
                 )}

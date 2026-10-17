@@ -50,6 +50,8 @@ import { HakAksesTab } from './components/tabs/HakAksesTab';
 import { PengaturanTab } from './components/tabs/PengaturanTab';
 import { ColumnSettingsModal } from './components/modals/ColumnSettingsModal';
 import { BrandCustomizerModal } from './components/modals/BrandCustomizerModal';
+import { PublicInformationPortal } from './components/public/PublicInformationPortal';
+import { PublicShareModal } from './components/modals/PublicShareModal';
 import { ColumnVisibilitySettings } from './services/storageService';
 import { applyDynamicBranding } from './utils/brandingHelper';
 import { AppBrandingSettings } from './types';
@@ -86,6 +88,30 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
   const [isBrandCustomizerOpen, setIsBrandCustomizerOpen] = useState(false);
+
+  // Public Portal State (Linktree / Guest View: ?view=public)
+  const [isPublicView, setIsPublicView] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('view') === 'public';
+  });
+
+  const [isPublicShareModalOpen, setIsPublicShareModalOpen] = useState(false);
+
+  const handleOpenPublicPortal = () => {
+    setIsPublicView(true);
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', 'public');
+    window.history.pushState({}, '', url.toString());
+  };
+
+  const handleBackToLoginFromPublic = () => {
+    setIsPublicView(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('view');
+    window.history.pushState({}, '', url.pathname);
+    setIsLoginModalOpen(true);
+  };
 
   // App Branding & Dynamic Logo Settings
   const [branding, setBranding] = useState<AppBrandingSettings>(() => storageService.getAppBranding());
@@ -675,6 +701,21 @@ export default function App() {
     setActiveTab('profil');
   };
 
+  // If public view (?view=public) is requested, bypass login and render read-only public portal
+  if (isPublicView) {
+    return (
+      <>
+        <PublicInformationPortal
+          staffList={staffList}
+          presensiList={presensiList}
+          branding={branding}
+          onOpenLogin={handleBackToLoginFromPublic}
+        />
+        <AppDialogModal />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans">
       {/* Dev Supervisor Floating Bar */}
@@ -709,6 +750,7 @@ export default function App() {
         onOpenColumnSettings={() => setIsColumnSettingsOpen(true)}
         branding={branding}
         onOpenBrandCustomizer={() => setIsBrandCustomizerOpen(true)}
+        onOpenPublicShare={() => setIsPublicShareModalOpen(true)}
       />
 
       {/* Sidebar for Desktop / Tablet */}
@@ -977,6 +1019,7 @@ export default function App() {
         secretDoorTriggered={secretDoorTriggered}
         onCloseSecretDoorTrigger={() => setSecretDoorTriggered(false)}
         onUnlockDeveloperMode={() => setIsDevSupervisorVisible(true)}
+        onOpenPublicPortal={handleOpenPublicPortal}
       />
 
       {/* Brand & Logo In-App Customizer Modal */}
@@ -986,6 +1029,13 @@ export default function App() {
         branding={branding}
         onSaveBranding={handleSaveBranding}
         onResetBranding={handleResetBranding}
+      />
+
+      {/* Public Share Modal (Linktree / Guest Access) */}
+      <PublicShareModal
+        isOpen={isPublicShareModalOpen}
+        onClose={() => setIsPublicShareModalOpen(false)}
+        appName={branding?.appName}
       />
 
       {/* Offline Status Toast */}
