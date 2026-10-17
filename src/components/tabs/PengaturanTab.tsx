@@ -16,9 +16,12 @@ import {
   RefreshCw,
   FileSpreadsheet,
   Zap,
+  Smartphone,
+  Laptop,
+  HelpCircle,
 } from 'lucide-react';
-import { StaffData } from '../../types';
-import { ColumnVisibilitySettings, storageService } from '../../services/storageService';
+import { StaffData, AppBrandingSettings } from '../../types';
+import { ColumnVisibilitySettings, storageService, DEFAULT_BRANDING } from '../../services/storageService';
 import { formatRupiah } from '../../services/payrollEngine';
 
 interface PengaturanTabProps {
@@ -26,6 +29,8 @@ interface PengaturanTabProps {
   onUpdateColumnSettings: (newSettings: ColumnVisibilitySettings) => void;
   onNavigateTab: (tabId: string) => void;
   staffList?: StaffData[];
+  branding?: AppBrandingSettings;
+  onOpenBrandCustomizer?: () => void;
   isAutoRefreshActive?: boolean;
   onToggleAutoRefresh?: () => void;
   isDatasheetSourceActive?: boolean;
@@ -39,6 +44,8 @@ export const PengaturanTab: React.FC<PengaturanTabProps> = ({
   onUpdateColumnSettings,
   onNavigateTab,
   staffList = [],
+  branding = DEFAULT_BRANDING,
+  onOpenBrandCustomizer,
   isAutoRefreshActive = true,
   onToggleAutoRefresh,
   isDatasheetSourceActive = false,
@@ -152,6 +159,128 @@ export const PengaturanTab: React.FC<PengaturanTabProps> = ({
               Semua rumus, integrasi REST GAS, dan sinkronisasi data tetap berjalan normal tanpa risiko rusak.
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Brand & Logo In-App Customizer Card */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 sm:p-7 shadow-xs space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-500 text-white flex items-center justify-center shadow-md shadow-rose-500/20 shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                  Identitas &amp; Logo Web Apps (Kustomisasi Mandiri)
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-50 dark:bg-pink-950 text-pink-600 dark:text-pink-400 border border-pink-200 dark:border-pink-900">
+                  Tanpa Ubah Kode
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Ganti logo perusahaan, nama aplikasi, dan nama thumbnail instalasi HP/Laptop langsung dari browser tanpa perlu menyentuh kode pemrograman.
+              </p>
+            </div>
+          </div>
+
+          {onOpenBrandCustomizer && (
+            <button
+              onClick={onOpenBrandCustomizer}
+              className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all group shrink-0 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Ganti Logo &amp; Profil Aplikasi</span>
+            </button>
+          )}
+        </div>
+
+        {/* Current Identity Preview Display */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Logo & Thumbnail Preview */}
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-tr from-blue-700 via-indigo-600 to-cyan-500 flex items-center justify-center text-white font-black text-xl shadow-md border-2 border-white dark:border-slate-700 shrink-0">
+              {branding.logoUrl ? (
+                <img
+                  src={branding.logoUrl}
+                  alt={branding.appName || 'Logo Aplikasi'}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span>{branding.badgeText || 'PP1'}</span>
+              )}
+            </div>
+            <div className="space-y-1 min-w-0">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                Logo / Thumbnail Aktif
+              </span>
+              <div className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate">
+                {branding.logoUrl ? 'Logo Kustom (Terunggah)' : 'Logo Standar Pabrik'}
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Tampil di Navbar, Favicon, &amp; Home Screen HP
+              </p>
+            </div>
+          </div>
+
+          {/* App Name Display */}
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-1">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+              Nama Lengkap Aplikasi
+            </span>
+            <div className="font-bold text-sm text-slate-900 dark:text-white truncate">
+              {branding.appName || 'HR STAFF - PRODUKSI I'}
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+              {branding.appSubtitle || 'PT Batu Karang — Divisi Produksi I (PP1)'}
+            </p>
+          </div>
+
+          {/* Short Name & PWA Thumbnail Text */}
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-1">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+              Label Thumbnail di HP (PWA)
+            </span>
+            <div className="font-bold text-sm text-slate-900 dark:text-white font-mono flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-blue-500" />
+              <span>{branding.appShortName || 'HR STAFF I'}</span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Teks yang terbaca di bawah ikon pada menu ponsel
+            </p>
+          </div>
+        </div>
+
+        {/* Detailed Explanation for User Question */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 space-y-3">
+          <div className="flex items-center gap-2 text-blue-900 dark:text-blue-300 font-bold text-xs">
+            <HelpCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <span>Bagaimana cara kerja Nama &amp; Thumbnail Logo saat Aplikasi Di-install di HP/Laptop?</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+            <div className="space-y-1.5 p-3 bg-white dark:bg-slate-900 rounded-xl border border-blue-100 dark:border-blue-900/40">
+              <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Laptop className="w-3.5 h-3.5 text-blue-600" />
+                <span>1. Web App Manifest &amp; PWA Standard</span>
+              </div>
+              <p>
+                Sistem menggunakan file <code>manifest.json</code> yang memberi tahu browser ponsel (Chrome, Samsung Internet, Edge) dan laptop tentang nama aplikasi (<code>name</code>: <strong>{branding.appName}</strong>), nama thumbnail di layar (<code>short_name</code>: <strong>{branding.appShortName}</strong>), serta ikon aplikasi beresolusi 192x192 dan 512x512.
+              </p>
+            </div>
+
+            <div className="space-y-1.5 p-3 bg-white dark:bg-slate-900 rounded-xl border border-blue-100 dark:border-blue-900/40">
+              <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
+                <span>2. Kustomisasi Dinamis Tanpa Ubah Kode</span>
+              </div>
+              <p>
+                Ketika Anda mengganti logo lewat tombol di atas, gambar langsung dikompres ke format ringan (&lt; 80KB), disimpan di penyimpanan lokal perangkat, dan <strong>diinjeksikan langsung ke runtime browser via Dynamic Blob URL</strong>. Jadi Anda tidak perlu mengedit file kode atau deploy ulang.
+              </p>
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 italic">
+            *Tips: Jika Anda sudah meng-install aplikasi ini di layar utama HP sebelumnya, sistem operasi HP menyimpan ikon lama dalam cache launcher. Untuk memunculkan logo baru di layar depan HP, hapus ikon lama di HP lalu buka Web Apps ini dan klik &quot;Install Web App&quot; kembali.
+          </p>
         </div>
       </div>
 

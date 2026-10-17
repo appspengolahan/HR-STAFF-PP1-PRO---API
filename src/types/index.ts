@@ -53,6 +53,7 @@ export interface StaffData {
   faskes?: string;
   bpjsKesehatanNominal: number; // Tetap per staff (bukan persentase)
   shiftDefault: 'Shift 1' | 'Shift 2' | 'Shift 3' | 'Non-Shift';
+  fotoUrl?: string; // Foto profil staf (base64 / URL)
 }
 
 export type JenisIjin =
@@ -235,3 +236,14 @@ export interface GasConfig {
   status: 'connected' | 'idle' | 'error' | 'syncing';
   errorMessage?: string;
 }
+
+export interface AppBrandingSettings {
+  appName: string; // e.g. "HR STAFF - PRODUKSI I"
+  appShortName: string; // e.g. "HR STAFF I"
+  appSubtitle: string; // e.g. "PT Batu Karang — Divisi Produksi I (PP1)"
+  companyName: string; // e.g. "PT BATU KARANG"
+  logoUrl?: string; // Data URL Base64 atau URL gambar logo kustom
+  badgeText?: string; // Inisial badge alternatif (misal "PP1" atau "BK")
+  updatedAt?: string;
+}
+

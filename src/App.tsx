@@ -49,7 +49,10 @@ import { ProfilStaffTab } from './components/tabs/ProfilStaffTab';
 import { HakAksesTab } from './components/tabs/HakAksesTab';
 import { PengaturanTab } from './components/tabs/PengaturanTab';
 import { ColumnSettingsModal } from './components/modals/ColumnSettingsModal';
+import { BrandCustomizerModal } from './components/modals/BrandCustomizerModal';
 import { ColumnVisibilitySettings } from './services/storageService';
+import { applyDynamicBranding } from './utils/brandingHelper';
+import { AppBrandingSettings } from './types';
 
 export default function App() {
   // Master State
@@ -82,6 +85,26 @@ export default function App() {
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
+  const [isBrandCustomizerOpen, setIsBrandCustomizerOpen] = useState(false);
+
+  // App Branding & Dynamic Logo Settings
+  const [branding, setBranding] = useState<AppBrandingSettings>(() => storageService.getAppBranding());
+
+  useEffect(() => {
+    applyDynamicBranding(branding);
+  }, [branding]);
+
+  const handleSaveBranding = (newBranding: AppBrandingSettings) => {
+    storageService.saveAppBranding(newBranding);
+    setBranding(newBranding);
+    applyDynamicBranding(newBranding);
+  };
+
+  const handleResetBranding = () => {
+    const def = storageService.resetAppBranding();
+    setBranding(def);
+    applyDynamicBranding(def);
+  };
 
   // Column Visibility Settings (Gaji Pokok & Tunjangan Jabatan)
   const [columnSettings, setColumnSettings] = useState<ColumnVisibilitySettings>(() =>
@@ -96,9 +119,23 @@ export default function App() {
   // Secret Door & Developer Supervisor
   const [secretDoorTriggered, setSecretDoorTriggered] = useState(false);
   const [isDevSupervisorVisible, setIsDevSupervisorVisible] = useState(() => {
-    const role = currentUser?.role;
-    return role === 'Lead Developer' || role === 'Project Manager';
+    const saved = localStorage.getItem('BK_DEV_SUPERVISOR_VISIBLE');
+    if (saved !== null) return saved === 'true';
+    return false; // Default false agar header tetap bersih dan tidak terganggu
   });
+
+  const handleCloseDevSupervisor = () => {
+    setIsDevSupervisorVisible(false);
+    localStorage.setItem('BK_DEV_SUPERVISOR_VISIBLE', 'false');
+  };
+
+  const handleToggleDevSupervisor = () => {
+    setIsDevSupervisorVisible((prev) => {
+      const next = !prev;
+      localStorage.setItem('BK_DEV_SUPERVISOR_VISIBLE', next ? 'true' : 'false');
+      return next;
+    });
+  };
 
   // Presensi Live Sync State
   const [isSyncingPresensi, setIsSyncingPresensi] = useState(false);
@@ -644,7 +681,7 @@ export default function App() {
       <RoleSimulatorBar
         currentUser={currentUser}
         onSwitchRole={handleSwitchRole}
-        onClose={() => setIsDevSupervisorVisible(false)}
+        onClose={handleCloseDevSupervisor}
         isVisible={isDevSupervisorVisible}
       />
 
@@ -661,6 +698,8 @@ export default function App() {
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={handleToggleSidebar}
         isDevSupervisorVisible={isDevSupervisorVisible}
+        onToggleDevSupervisor={handleToggleDevSupervisor}
+        onSwitchRole={handleSwitchRole}
         isAutoRefreshActive={isAutoRefreshActive}
         onToggleAutoRefresh={handleToggleAutoRefresh}
         isDatasheetSourceActive={isDatasheetSourceActive}
@@ -668,6 +707,8 @@ export default function App() {
         onManualSyncDatasheet={handleManualSyncDatasheet}
         isSyncing={isSyncingPresensi}
         onOpenColumnSettings={() => setIsColumnSettingsOpen(true)}
+        branding={branding}
+        onOpenBrandCustomizer={() => setIsBrandCustomizerOpen(true)}
       />
 
       {/* Sidebar for Desktop / Tablet */}
@@ -684,8 +725,8 @@ export default function App() {
       {/* Main Viewport */}
       <div
         className={`flex-1 flex flex-col transition-all duration-300 pt-14 pb-24 lg:pb-10 print:pt-0 print:pb-0 print:m-0 print:p-0 ${
-          isDevSupervisorVisible ? 'mt-8 print:mt-0' : ''
-        } ${sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-64'} print:lg:ml-0`}
+          sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-64'
+        } print:lg:ml-0`}
       >
         <main className="flex-1 p-3 sm:p-6 max-w-7xl w-full mx-auto print:p-0 print:m-0 print:max-w-none">
           {/* Mobile Install PWA Banner */}
@@ -830,6 +871,8 @@ export default function App() {
               onToggleDatasheetSource={handleToggleDatasheetSource}
               onManualSyncDatasheet={handleManualSyncDatasheet}
               isSyncing={isSyncingPresensi}
+              branding={branding}
+              onOpenBrandCustomizer={() => setIsBrandCustomizerOpen(true)}
             />
           )}
         </main>
@@ -934,6 +977,15 @@ export default function App() {
         secretDoorTriggered={secretDoorTriggered}
         onCloseSecretDoorTrigger={() => setSecretDoorTriggered(false)}
         onUnlockDeveloperMode={() => setIsDevSupervisorVisible(true)}
+      />
+
+      {/* Brand & Logo In-App Customizer Modal */}
+      <BrandCustomizerModal
+        isOpen={isBrandCustomizerOpen}
+        onClose={() => setIsBrandCustomizerOpen(false)}
+        branding={branding}
+        onSaveBranding={handleSaveBranding}
+        onResetBranding={handleResetBranding}
       />
 
       {/* Offline Status Toast */}

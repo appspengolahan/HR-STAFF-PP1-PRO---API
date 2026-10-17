@@ -11,6 +11,7 @@ import {
   StaffData,
   DeletedArchiveRecord,
   UserRole,
+  AppBrandingSettings,
 } from '../types';
 import {
   INITIAL_CALON_LIST,
@@ -30,6 +31,15 @@ export interface ColumnVisibilitySettings {
   showTunjanganJabatan: boolean;
 }
 
+export const DEFAULT_BRANDING: AppBrandingSettings = {
+  appName: 'HR STAFF - PRODUKSI I',
+  appShortName: 'HR STAFF I',
+  appSubtitle: 'PT Batu Karang — Divisi Produksi I (PP1)',
+  companyName: 'PT BATU KARANG',
+  badgeText: 'PP1',
+  updatedAt: '2026-10-14T00:00:00.000Z',
+};
+
 const KEYS = {
   STAFF: 'bk_hr_staff_list_v3',
   PRESENSI: 'bk_hr_presensi_list_v3',
@@ -46,6 +56,7 @@ const KEYS = {
   THEME_MODE: 'bk_hr_theme_mode_v3',
   SIDEBAR_COLLAPSED: 'bk_hr_sidebar_collapsed_v3',
   COLUMN_SETTINGS: 'bk_hr_column_settings_v4',
+  BRANDING: 'bk_hr_app_branding_v1',
 };
 
 // Cleanup old obsolete v1 and v2 keys
@@ -615,6 +626,22 @@ export const storageService = {
   },
   saveColumnSettings(settings: ColumnVisibilitySettings): void {
     writeStorage(KEYS.COLUMN_SETTINGS, settings);
+  },
+
+  // App Branding & Custom Logo (Penggantian Logo & Identitas Aplikasi Langsung di Web Apps)
+  getAppBranding(): AppBrandingSettings {
+    return readStorage<AppBrandingSettings>(KEYS.BRANDING, DEFAULT_BRANDING);
+  },
+  saveAppBranding(branding: AppBrandingSettings): void {
+    const updated = {
+      ...branding,
+      updatedAt: new Date().toISOString(),
+    };
+    writeStorage(KEYS.BRANDING, updated);
+  },
+  resetAppBranding(): AppBrandingSettings {
+    writeStorage(KEYS.BRANDING, DEFAULT_BRANDING);
+    return DEFAULT_BRANDING;
   },
 
   // Reset to initial demo data

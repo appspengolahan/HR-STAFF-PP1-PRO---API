@@ -18,9 +18,13 @@ import {
   CheckCircle2,
   RefreshCw,
   FileSpreadsheet,
+  Sparkles,
+  ShieldCheck,
+  UserCheck,
 } from 'lucide-react';
-import { AuthUser } from '../types';
+import { AuthUser, AppBrandingSettings, UserRole } from '../types';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import { ROLES } from './RoleSimulatorBar';
 
 interface NavbarProps {
   currentUser: AuthUser | null;
@@ -34,6 +38,8 @@ interface NavbarProps {
   sidebarCollapsed: boolean;
   onToggleSidebar?: () => void;
   isDevSupervisorVisible?: boolean;
+  onToggleDevSupervisor?: () => void;
+  onSwitchRole?: (role: UserRole) => void;
   isAutoRefreshActive?: boolean;
   onToggleAutoRefresh?: () => void;
   isDatasheetSourceActive?: boolean;
@@ -41,6 +47,8 @@ interface NavbarProps {
   onManualSyncDatasheet?: () => void;
   isSyncing?: boolean;
   onOpenColumnSettings?: () => void;
+  branding?: AppBrandingSettings;
+  onOpenBrandCustomizer?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -55,6 +63,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   sidebarCollapsed,
   onToggleSidebar,
   isDevSupervisorVisible = false,
+  onToggleDevSupervisor,
+  onSwitchRole,
   isAutoRefreshActive = true,
   onToggleAutoRefresh,
   isDatasheetSourceActive = false,
@@ -62,6 +72,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onManualSyncDatasheet,
   isSyncing = false,
   onOpenColumnSettings,
+  branding,
+  onOpenBrandCustomizer,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
@@ -130,22 +142,30 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header
-      className={`fixed ${isDevSupervisorVisible ? 'top-8' : 'top-0'} left-0 right-0 w-full h-14 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-30 transition-all duration-300 flex items-center justify-between px-3 sm:px-6 shadow-xs no-print print:hidden`}
+      className="fixed top-0 left-0 right-0 w-full h-14 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-30 transition-all duration-300 flex items-center justify-between px-3 sm:px-6 shadow-xs no-print print:hidden"
     >
       {/* SISI KIRI: Brand & Judul Aplikasi Sejajar Persis dengan Menu Sidebar */}
       <div className="flex items-center gap-3 min-w-0 pr-2 pl-0.5 sm:pl-1">
         <div
           onClick={handleLogoClick}
-          className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 via-indigo-600 to-cyan-500 flex items-center justify-center text-white font-black text-xs shadow-md shadow-blue-900/20 cursor-pointer select-none active:scale-95 transition-transform shrink-0"
-          title="PT Batu Karang - Divisi Produksi I (Klik 5x untuk Developer Door)"
+          className="relative group w-9 h-9 rounded-xl overflow-hidden bg-gradient-to-tr from-blue-700 via-indigo-600 to-cyan-500 flex items-center justify-center text-white font-black text-xs shadow-md shadow-blue-900/20 cursor-pointer select-none active:scale-95 transition-transform shrink-0 border border-white/20 dark:border-slate-700"
+          title={`${branding?.appName || 'HR STAFF - PRODUKSI I'} (Klik 5x untuk Developer Door)`}
         >
-          BK
+          {branding?.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              alt={branding.appName || 'Logo Aplikasi'}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <span>{branding?.badgeText || 'PP1'}</span>
+          )}
         </div>
 
         <div className="leading-tight truncate min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="font-extrabold text-sm sm:text-base tracking-wide text-slate-900 dark:text-white truncate">
-              HR STAFF - PRODUKSI I
+              {branding?.appName || 'HR STAFF - PRODUKSI I'}
             </h1>
             <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-500/20 shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -153,7 +173,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </span>
           </div>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-            PT Batu Karang — Divisi Produksi I (PP1)
+            {branding?.appSubtitle || 'PT Batu Karang — Divisi Produksi I (PP1)'}
           </p>
         </div>
       </div>
@@ -303,6 +323,53 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               )}
 
+              {/* Seksi Simulasi Peran (Terintegrasi di Menu Profil) */}
+              {onSwitchRole && (
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800/80 mb-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
+                      Ganti / Simulasi Peran
+                    </span>
+                    {onToggleDevSupervisor && (
+                      <button
+                        onClick={onToggleDevSupervisor}
+                        className={`text-[9px] px-1.5 py-0.5 rounded font-semibold cursor-pointer transition-colors ${
+                          isDevSupervisorVisible
+                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                            : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                        }`}
+                        title="Tampilkan / sembunyikan widget melayang di pojok kiri bawah"
+                      >
+                        {isDevSupervisorVisible ? 'Widget Bawah: ON' : 'Widget Bawah: OFF'}
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 max-h-36 overflow-y-auto pr-0.5">
+                    {ROLES.map((r) => {
+                      const isActive = currentUser?.role === r.role;
+                      return (
+                        <button
+                          key={r.role}
+                          onClick={() => {
+                            onSwitchRole(r.role);
+                            setIsDropdownOpen(false);
+                          }}
+                          className={`px-2 py-1.5 rounded-lg text-left text-[10px] font-semibold transition-all flex items-center justify-between cursor-pointer ${
+                            isActive
+                              ? `${r.color} shadow-xs font-bold scale-[1.02]`
+                              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/60 dark:border-slate-700/60'
+                          }`}
+                        >
+                          <span className="truncate">{r.label}</span>
+                          {isActive && <UserCheck className="w-3 h-3 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Seksi 1: Alat Integrasi & Sistem */}
               <div className="px-2 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 Alat &amp; Integrasi Sistem
@@ -422,6 +489,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                     <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
                       PWA
+                    </span>
+                  </button>
+                )}
+
+                {onOpenBrandCustomizer && (
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onOpenBrandCustomizer();
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors text-left cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-pink-50 dark:bg-pink-950/50 text-pink-600 dark:text-pink-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-xs">Ganti Logo &amp; Profil Apps</div>
+                        <div className="text-[10px] text-slate-400">Kustomisasi Logo, Nama &amp; PWA</div>
+                      </div>
+                    </div>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-100 text-pink-700 dark:bg-pink-950/60 dark:text-pink-300">
+                      Logo
                     </span>
                   </button>
                 )}

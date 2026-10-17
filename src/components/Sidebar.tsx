@@ -75,9 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className={`fixed ${
-        isDevSupervisorVisible ? 'top-[88px] h-[calc(100vh-88px)]' : 'top-14 h-[calc(100vh-56px)]'
-      } left-0 z-20 hidden lg:flex flex-col bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 select-none ${
+      className={`fixed top-14 h-[calc(100vh-56px)] left-0 z-20 hidden lg:flex flex-col bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 select-none ${
         collapsed ? 'w-[68px]' : 'w-64'
       } no-print print:hidden`}
     >
