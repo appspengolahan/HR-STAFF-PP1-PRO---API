@@ -317,11 +317,13 @@ export default function App() {
   }, [themeMode]);
 
   // Handle Automatic Due Mutation Application
-  const handleApplyDueMutations = () => {
+  const handleApplyDueMutations = (silent = false) => {
     const todayStr = new Date().toISOString().split('T')[0];
     let appliedCount = 0;
-    const updatedMutasi = [...mutasiList];
-    const updatedStaff = [...staffList];
+    const currentMutasi = storageService.getMutasiList();
+    const currentStaff = storageService.getStaffList();
+    const updatedMutasi = [...currentMutasi];
+    const updatedStaff = [...currentStaff];
 
     updatedMutasi.forEach((m, idx) => {
       if (m.status === 'Terjadwal' && m.tanggalEfektif <= todayStr) {
@@ -338,10 +340,10 @@ export default function App() {
           else if (m.jenisMutasi === 'Status Aktif') updatedStaff[sIdx].statusAktif = m.nilaiBaru as any;
           else if (m.jenisMutasi === 'Gaji Pokok') {
             updatedStaff[sIdx].gajiPokok = Number(m.nilaiBaru) || 0;
-            updatedStaff[sIdx].totalGaji = updatedStaff[sIdx].gajiPokok + updatedStaff[sIdx].tunjanganJabatan;
+            updatedStaff[sIdx].totalGaji = updatedStaff[sIdx].gajiPokok + (updatedStaff[sIdx].tunjanganJabatan || 0);
           } else if (m.jenisMutasi === 'Tunjangan Jabatan') {
             updatedStaff[sIdx].tunjanganJabatan = Number(m.nilaiBaru) || 0;
-            updatedStaff[sIdx].totalGaji = updatedStaff[sIdx].gajiPokok + updatedStaff[sIdx].tunjanganJabatan;
+            updatedStaff[sIdx].totalGaji = (updatedStaff[sIdx].gajiPokok || 0) + updatedStaff[sIdx].tunjanganJabatan;
           }
         }
       }
@@ -352,11 +354,26 @@ export default function App() {
       storageService.saveStaffList(updatedStaff);
       setMutasiList(updatedMutasi);
       setStaffList(updatedStaff);
-      appAlert(`${appliedCount} mutasi terjadwal yang sudah jatuh tempo berhasil diterapkan ke database.`);
+      if (!silent) {
+        appAlert(`${appliedCount} mutasi terjadwal yang sudah jatuh tempo berhasil diterapkan ke database.`);
+      }
     } else {
-      appAlert('Tidak ada mutasi terjadwal yang jatuh tempo hari ini.');
+      if (!silent) {
+        appAlert('Tidak ada mutasi terjadwal yang jatuh tempo hari ini.');
+      }
     }
   };
+
+  // Auto-apply mutasi terjadwal yang telah tiba tanggal efektifnya secara otomatis
+  useEffect(() => {
+    handleApplyDueMutations(true);
+
+    const interval = setInterval(() => {
+      handleApplyDueMutations(true);
+    }, 5 * 60 * 1000); // Evaluasi otomatis setiap 5 menit
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Toggle Theme
   const handleToggleTheme = () => {
@@ -619,8 +636,36 @@ export default function App() {
   };
 
   const handleUpdateMutasiStatus = (id: string, status: 'Diterapkan' | 'Dibatalkan') => {
+    const listMut = storageService.getMutasiList();
+    const target = listMut.find((m) => m.id === id);
+    if (!target) return;
+
     storageService.updateMutasiStatus(id, status);
     setMutasiList(storageService.getMutasiList());
+
+    if (status === 'Diterapkan') {
+      const staffCurrent = storageService.getStaffList();
+      const sIdx = staffCurrent.findIndex((s) => s.nip === target.nip);
+      if (sIdx !== -1) {
+        if (target.jenisMutasi === 'Jabatan') staffCurrent[sIdx].jabatan = target.nilaiBaru;
+        else if (target.jenisMutasi === 'Level/Kategori') staffCurrent[sIdx].level = target.nilaiBaru;
+        else if (target.jenisMutasi === 'Sekup') staffCurrent[sIdx].sekup = target.nilaiBaru as any;
+        else if (target.jenisMutasi === 'Status Kepegawaian') staffCurrent[sIdx].status = target.nilaiBaru as any;
+        else if (target.jenisMutasi === 'Status Aktif') staffCurrent[sIdx].statusAktif = target.nilaiBaru as any;
+        else if (target.jenisMutasi === 'Gaji Pokok') {
+          staffCurrent[sIdx].gajiPokok = Number(target.nilaiBaru) || 0;
+          staffCurrent[sIdx].totalGaji = staffCurrent[sIdx].gajiPokok + (staffCurrent[sIdx].tunjanganJabatan || 0);
+        } else if (target.jenisMutasi === 'Tunjangan Jabatan') {
+          staffCurrent[sIdx].tunjanganJabatan = Number(target.nilaiBaru) || 0;
+          staffCurrent[sIdx].totalGaji = (staffCurrent[sIdx].gajiPokok || 0) + staffCurrent[sIdx].tunjanganJabatan;
+        }
+        storageService.saveStaffList(staffCurrent);
+        setStaffList(staffCurrent);
+        appAlert(`Mutasi ${target.jenisMutasi} untuk ${target.nama} (${target.nip}) berhasil diterapkan ke database.`);
+      }
+    } else if (status === 'Dibatalkan') {
+      appAlert(`Jadwal mutasi untuk ${target.nama} (${target.nip}) telah dibatalkan.`);
+    }
   };
 
   // Handlers for Calon
