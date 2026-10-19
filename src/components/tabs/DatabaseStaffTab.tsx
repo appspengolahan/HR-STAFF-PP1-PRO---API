@@ -13,6 +13,7 @@ import {
   FileText,
   UserCheck,
   SlidersHorizontal,
+  ArrowRight,
 } from 'lucide-react';
 import { StaffData, MutasiRecord } from '../../types';
 import { formatRupiah } from '../../services/payrollEngine';
@@ -111,6 +112,175 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
   const [mutTanggal, setMutTanggal] = useState(new Date().toISOString().split('T')[0]);
   const [mutNilaiBaru, setMutNilaiBaru] = useState('');
   const [mutKeterangan, setMutKeterangan] = useState('');
+  const [isCustomJabatan, setIsCustomJabatan] = useState(false);
+  const [isCustomLevel, setIsCustomLevel] = useState(false);
+  const [isCustomGp, setIsCustomGp] = useState(false);
+  const [isCustomTj, setIsCustomTj] = useState(false);
+
+  // List Jabatan Terpadu (Dari Data Staf Aktif + Jabatan Resmi Divisi Produksi I)
+  const availableJabatans = useMemo(() => {
+    const set = new Set<string>();
+    [
+      'Manajer Operasional Produksi I',
+      'Kepala Administrasi 1',
+      'Koordinator Produksi PP1',
+      'Mandor Proses Tembakau',
+      'Mandor Proses Cengkeh',
+      'Mandor Proses Blend',
+      'Mandor Gudang (Kecil) Tembakau & Krosok',
+      'Plt. Kepala Pengolahan 2 (Cengkeh & Blend)',
+      'Plt. Kepala Mandor Proses Cengkeh',
+      'Plt. Kepala Gudang (Kecil) Persediaan 1',
+      'Plt. Kepala Gudang (Kecil) Persediaan 3',
+      'Plt. Kepala Gudang (Kecil) Tembakau & Krosok',
+      'Quality Control Tembakau',
+      'Quality Control Blend',
+      'Administrasi Proses Tembakau & Krosok',
+      'Administrasi Proses Cengkeh',
+      'Adminsitrasi Proses Blend',
+      'Administrasi Gudang (Kecil) Cengkeh',
+      'Administrasi Gudang (Kecil) Blend',
+      'Administrasi Gudang (Kecil) Persediaan Tembakau & Krosok',
+      'Operator Mesin KT 2',
+      'Operator Mesin Primery',
+      'Operator RC 4',
+      'Operator Mesin Boiler',
+      'Mekanik',
+      'Teknisi Elektrikal',
+      'Staff Quality Control',
+    ].forEach((j) => set.add(j));
+
+    staffList.forEach((s) => {
+      if (s.jabatan && s.jabatan.trim()) set.add(s.jabatan.trim());
+    });
+    if (selectedStaffForMutasi?.jabatan && selectedStaffForMutasi.jabatan.trim()) {
+      set.add(selectedStaffForMutasi.jabatan.trim());
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'id'));
+  }, [staffList, selectedStaffForMutasi]);
+
+  // List Level/Kategori (Grade Golongan + Tingkatan Fungsional)
+  const availableLevels = useMemo(() => {
+    const set = new Set<string>();
+    ['3 -', '3 A', '5 -', '5 A', '5 B', '7 A', '7 B', '9 -', '9 A', '9 B', '15 -', '15 A', '25 - (B)'].forEach((l) =>
+      set.add(l)
+    );
+    staffList.forEach((s) => {
+      if (s.level && s.level.trim()) set.add(s.level.trim());
+    });
+    if (selectedStaffForMutasi?.level && selectedStaffForMutasi.level.trim()) {
+      set.add(selectedStaffForMutasi.level.trim());
+    }
+    return Array.from(set);
+  }, [staffList, selectedStaffForMutasi]);
+
+  // Nominal Standar Gaji Pokok
+  const standardGpOptions = useMemo(() => {
+    const set = new Set<number>();
+    [3587213, 3802862, 3900000, 4183148, 4210344, 4484016, 4753578, 6655009, 19014310].forEach((n) => set.add(n));
+    staffList.forEach((s) => {
+      if (s.gajiPokok && s.gajiPokok > 0) set.add(s.gajiPokok);
+    });
+    if (selectedStaffForMutasi?.gajiPokok && selectedStaffForMutasi.gajiPokok > 0) {
+      set.add(selectedStaffForMutasi.gajiPokok);
+    }
+    return Array.from(set).sort((a, b) => a - b);
+  }, [staffList, selectedStaffForMutasi]);
+
+  // Nominal Standar Tunjangan Jabatan
+  const standardTjOptions = useMemo(() => {
+    const set = new Set<number>();
+    [0, 300000, 500000, 600000, 800000, 1000000, 2250000, 6500000].forEach((n) => set.add(n));
+    staffList.forEach((s) => {
+      if (s.tunjanganJabatan !== undefined && s.tunjanganJabatan >= 0) set.add(s.tunjanganJabatan);
+    });
+    if (selectedStaffForMutasi?.tunjanganJabatan !== undefined && selectedStaffForMutasi.tunjanganJabatan >= 0) {
+      set.add(selectedStaffForMutasi.tunjanganJabatan);
+    }
+    return Array.from(set).sort((a, b) => a - b);
+  }, [staffList, selectedStaffForMutasi]);
+
+  // Helper Buka Modal Mutasi dengan Preset Nilai Awal yang Relevan
+  const handleOpenMutasi = (
+    st: StaffData,
+    initialJenis: typeof mutJenis = 'Jabatan'
+  ) => {
+    setSelectedStaffForMutasi(st);
+    setMutJenis(initialJenis);
+    setMutTanggal(new Date().toISOString().split('T')[0]);
+    setMutKeterangan('');
+    setIsCustomJabatan(false);
+    setIsCustomLevel(false);
+    setIsCustomGp(false);
+    setIsCustomTj(false);
+
+    if (initialJenis === 'Jabatan') {
+      setMutNilaiBaru(st.jabatan || '');
+    } else if (initialJenis === 'Level/Kategori') {
+      setMutNilaiBaru(st.level || 'Staff');
+    } else if (initialJenis === 'Sekup') {
+      setMutNilaiBaru(st.sekup || 'Operasional');
+    } else if (initialJenis === 'Status Kepegawaian') {
+      setMutNilaiBaru(st.status || 'PKWT 1');
+    } else if (initialJenis === 'Status Aktif') {
+      setMutNilaiBaru(st.statusAktif || 'Aktif');
+    } else if (initialJenis === 'Gaji Pokok') {
+      setMutNilaiBaru(String(st.gajiPokok || 0));
+    } else if (initialJenis === 'Tunjangan Jabatan') {
+      setMutNilaiBaru(String(st.tunjanganJabatan || 0));
+    }
+  };
+
+  // Helper Ganti Jenis Mutasi -> Otomatis update Nilai Baru & Dropdown yang Relevan
+  const handleJenisMutasiChange = (newJenis: typeof mutJenis) => {
+    setMutJenis(newJenis);
+    setIsCustomJabatan(false);
+    setIsCustomLevel(false);
+    setIsCustomGp(false);
+    setIsCustomTj(false);
+
+    if (!selectedStaffForMutasi) return;
+
+    if (newJenis === 'Jabatan') {
+      setMutNilaiBaru(selectedStaffForMutasi.jabatan || '');
+    } else if (newJenis === 'Level/Kategori') {
+      setMutNilaiBaru(selectedStaffForMutasi.level || 'Staff');
+    } else if (newJenis === 'Sekup') {
+      setMutNilaiBaru(selectedStaffForMutasi.sekup || 'Operasional');
+    } else if (newJenis === 'Status Kepegawaian') {
+      setMutNilaiBaru(selectedStaffForMutasi.status || 'PKWT 1');
+    } else if (newJenis === 'Status Aktif') {
+      setMutNilaiBaru(selectedStaffForMutasi.statusAktif || 'Aktif');
+    } else if (newJenis === 'Gaji Pokok') {
+      setMutNilaiBaru(String(selectedStaffForMutasi.gajiPokok || 0));
+    } else if (newJenis === 'Tunjangan Jabatan') {
+      setMutNilaiBaru(String(selectedStaffForMutasi.tunjanganJabatan || 0));
+    }
+  };
+
+  // Helper Tutup Modal Mutasi
+  const handleCloseMutasi = () => {
+    setSelectedStaffForMutasi(null);
+    setMutNilaiBaru('');
+    setMutKeterangan('');
+    setIsCustomJabatan(false);
+    setIsCustomLevel(false);
+    setIsCustomGp(false);
+    setIsCustomTj(false);
+  };
+
+  // Helper Dapatkan Nilai Saat Ini untuk Pratinjau
+  const getCurrentValueLabel = () => {
+    if (!selectedStaffForMutasi) return '-';
+    if (mutJenis === 'Jabatan') return selectedStaffForMutasi.jabatan || '-';
+    if (mutJenis === 'Level/Kategori') return selectedStaffForMutasi.level || '-';
+    if (mutJenis === 'Sekup') return selectedStaffForMutasi.sekup || '-';
+    if (mutJenis === 'Status Kepegawaian') return selectedStaffForMutasi.status || '-';
+    if (mutJenis === 'Status Aktif') return selectedStaffForMutasi.statusAktif || 'Aktif';
+    if (mutJenis === 'Gaji Pokok') return `Rp ${(selectedStaffForMutasi.gajiPokok || 0).toLocaleString('id-ID')}`;
+    if (mutJenis === 'Tunjangan Jabatan') return `Rp ${(selectedStaffForMutasi.tunjanganJabatan || 0).toLocaleString('id-ID')}`;
+    return '-';
+  };
 
   // Filtered List
   const filtered = useMemo(() => {
@@ -202,16 +372,16 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
 
   const handleApplyMutasi = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedStaffForMutasi) return;
+    if (!selectedStaffForMutasi || !mutNilaiBaru.trim()) return;
 
     let nilaiLama = '';
-    if (mutJenis === 'Jabatan') nilaiLama = selectedStaffForMutasi.jabatan;
-    else if (mutJenis === 'Level/Kategori') nilaiLama = selectedStaffForMutasi.level;
-    else if (mutJenis === 'Sekup') nilaiLama = selectedStaffForMutasi.sekup;
-    else if (mutJenis === 'Status Kepegawaian') nilaiLama = selectedStaffForMutasi.status;
-    else if (mutJenis === 'Status Aktif') nilaiLama = selectedStaffForMutasi.statusAktif;
-    else if (mutJenis === 'Gaji Pokok') nilaiLama = String(selectedStaffForMutasi.gajiPokok);
-    else if (mutJenis === 'Tunjangan Jabatan') nilaiLama = String(selectedStaffForMutasi.tunjanganJabatan);
+    if (mutJenis === 'Jabatan') nilaiLama = selectedStaffForMutasi.jabatan || '';
+    else if (mutJenis === 'Level/Kategori') nilaiLama = selectedStaffForMutasi.level || '';
+    else if (mutJenis === 'Sekup') nilaiLama = selectedStaffForMutasi.sekup || '';
+    else if (mutJenis === 'Status Kepegawaian') nilaiLama = selectedStaffForMutasi.status || '';
+    else if (mutJenis === 'Status Aktif') nilaiLama = selectedStaffForMutasi.statusAktif || 'Aktif';
+    else if (mutJenis === 'Gaji Pokok') nilaiLama = String(selectedStaffForMutasi.gajiPokok || 0);
+    else if (mutJenis === 'Tunjangan Jabatan') nilaiLama = String(selectedStaffForMutasi.tunjanganJabatan || 0);
 
     const todayStr = new Date().toISOString().split('T')[0];
     const isFuture = mutTanggal > todayStr;
@@ -223,8 +393,8 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
       nama: selectedStaffForMutasi.nama,
       jenisMutasi: mutJenis,
       nilaiLama,
-      nilaiBaru: mutNilaiBaru,
-      keterangan: mutKeterangan,
+      nilaiBaru: mutNilaiBaru.trim(),
+      keterangan: mutKeterangan.trim(),
       diinputOleh: 'Lalu Mahendra Ali Akbar',
       status: isFuture ? 'Terjadwal' : 'Diterapkan',
     };
@@ -234,20 +404,23 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
     // If effective today or past, apply immediately
     if (!isFuture) {
       const patch: Partial<StaffData> = {};
-      if (mutJenis === 'Jabatan') patch.jabatan = mutNilaiBaru;
-      else if (mutJenis === 'Level/Kategori') patch.level = mutNilaiBaru;
+      if (mutJenis === 'Jabatan') patch.jabatan = mutNilaiBaru.trim();
+      else if (mutJenis === 'Level/Kategori') patch.level = mutNilaiBaru.trim();
       else if (mutJenis === 'Sekup') patch.sekup = mutNilaiBaru as 'Operasional' | 'Administrasi';
       else if (mutJenis === 'Status Kepegawaian') patch.status = mutNilaiBaru as any;
       else if (mutJenis === 'Status Aktif') patch.statusAktif = mutNilaiBaru as 'Aktif' | 'Non Aktif';
-      else if (mutJenis === 'Gaji Pokok') patch.gajiPokok = Number(mutNilaiBaru) || 0;
-      else if (mutJenis === 'Tunjangan Jabatan') patch.tunjanganJabatan = Number(mutNilaiBaru) || 0;
+      else if (mutJenis === 'Gaji Pokok') {
+        patch.gajiPokok = Number(mutNilaiBaru) || 0;
+        patch.totalGaji = (patch.gajiPokok || 0) + (selectedStaffForMutasi.tunjanganJabatan || 0);
+      } else if (mutJenis === 'Tunjangan Jabatan') {
+        patch.tunjanganJabatan = Number(mutNilaiBaru) || 0;
+        patch.totalGaji = (selectedStaffForMutasi.gajiPokok || 0) + (patch.tunjanganJabatan || 0);
+      }
 
       onUpdateStaff(selectedStaffForMutasi.nip, patch);
     }
 
-    setSelectedStaffForMutasi(null);
-    setMutNilaiBaru('');
-    setMutKeterangan('');
+    handleCloseMutasi();
   };
 
   const handleExportPdf = () => {
@@ -267,8 +440,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
         onActionClick={(nip) => {
           const st = staffList.find((s) => s.nip === nip);
           if (st) {
-            setSelectedStaffForMutasi(st);
-            setMutNilaiBaru(st.jabatan);
+            handleOpenMutasi(st, 'Status Kepegawaian');
           }
         }}
         actionLabel="Perpanjang / Mutasi"
@@ -480,11 +652,8 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                           Edit
                         </button>
                         <button
-                          onClick={() => {
-                            setSelectedStaffForMutasi(st);
-                            setMutNilaiBaru(st.jabatan);
-                          }}
-                          title="Ajukan Mutasi Jabatan / Gaji"
+                          onClick={() => handleOpenMutasi(st, 'Jabatan')}
+                          title="Ajukan Mutasi Jabatan / Gaji / Status"
                           className="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors"
                         >
                           <GitPullRequest className="w-3 h-3" />
@@ -747,81 +916,337 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                 </p>
               </div>
               <button
-                onClick={() => setSelectedStaffForMutasi(null)}
-                className="text-slate-400 hover:text-white"
+                onClick={handleCloseMutasi}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg"
               >
                 ✕
               </button>
             </div>
 
             <form onSubmit={handleApplyMutasi} className="p-6 space-y-4 text-xs">
+              {/* Komparasi Nilai Lama vs Nilai Baru */}
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] uppercase font-bold text-amber-700 dark:text-amber-400 block tracking-wider">
+                    Nilai Saat Ini ({mutJenis})
+                  </span>
+                  <span className="font-bold text-slate-900 dark:text-white text-xs truncate block">
+                    {getCurrentValueLabel()}
+                  </span>
+                </div>
+                <div className="shrink-0 px-2">
+                  <ArrowRight className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="min-w-0 flex-1 text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">
+                    Target Mutasi
+                  </span>
+                  <span className="font-bold text-blue-600 dark:text-blue-400 text-xs truncate block">
+                    {mutJenis}
+                  </span>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold mb-1">Jenis Mutasi</label>
+                  <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-200">
+                    Jenis Mutasi
+                  </label>
                   <select
                     value={mutJenis}
-                    onChange={(e) => setMutJenis(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg font-semibold"
+                    onChange={(e) => handleJenisMutasiChange(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
                   >
                     <option value="Jabatan">Jabatan</option>
                     <option value="Level/Kategori">Level/Kategori</option>
                     <option value="Sekup">Sekup (Operasional/Admin)</option>
                     <option value="Status Kepegawaian">Status Kepegawaian</option>
+                    <option value="Status Aktif">Status Aktif</option>
                     <option value="Gaji Pokok">Gaji Pokok</option>
                     <option value="Tunjangan Jabatan">Tunjangan Jabatan</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold mb-1">Tanggal Efektif</label>
+                  <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-200">
+                    Tanggal Efektif
+                  </label>
                   <input
                     type="date"
                     required
                     value={mutTanggal}
                     onChange={(e) => setMutTanggal(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
               </div>
 
+              {/* NILAI BARU - DINAMIS MENAMPILKAN DROPDOWN RELEVAN DENGAN JENIS MUTASI */}
               <div>
-                <label className="block font-semibold mb-1">Nilai Baru</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Nilai baru yang akan diterapkan..."
-                  value={mutNilaiBaru}
-                  onChange={(e) => setMutNilaiBaru(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg font-bold"
-                />
+                <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-200">
+                  Nilai Baru yang Diterapkan
+                </label>
+
+                {/* 1. JABATAN */}
+                {mutJenis === 'Jabatan' && (
+                  <div className="space-y-2">
+                    <select
+                      value={isCustomJabatan ? '__custom__' : mutNilaiBaru}
+                      onChange={(e) => {
+                        if (e.target.value === '__custom__') {
+                          setIsCustomJabatan(true);
+                          setMutNilaiBaru('');
+                        } else {
+                          setIsCustomJabatan(false);
+                          setMutNilaiBaru(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+                      required={!isCustomJabatan}
+                    >
+                      <option value="" disabled>-- Pilih Jabatan Resmi Staf --</option>
+                      {availableJabatans.map((j) => (
+                        <option key={j} value={j}>
+                          {j} {selectedStaffForMutasi.jabatan === j ? '(Jabatan Saat Ini)' : ''}
+                        </option>
+                      ))}
+                      <option value="__custom__">➕ Ketik Jabatan Kustom / Posisi Baru...</option>
+                    </select>
+
+                    {isCustomJabatan && (
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ketik nama jabatan baru..."
+                        value={mutNilaiBaru}
+                        onChange={(e) => setMutNilaiBaru(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border-2 border-amber-500 rounded-lg font-bold text-slate-900 dark:text-white"
+                        autoFocus
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* 2. LEVEL / KATEGORI */}
+                {mutJenis === 'Level/Kategori' && (
+                  <div className="space-y-2">
+                    <select
+                      value={isCustomLevel ? '__custom__' : mutNilaiBaru}
+                      onChange={(e) => {
+                        if (e.target.value === '__custom__') {
+                          setIsCustomLevel(true);
+                          setMutNilaiBaru('');
+                        } else {
+                          setIsCustomLevel(false);
+                          setMutNilaiBaru(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+                      required={!isCustomLevel}
+                    >
+                      <option value="" disabled>-- Pilih Level / Kategori --</option>
+                      <optgroup label="Tingkatan Jabatan Fungsional">
+                        <option value="Staff">Staff</option>
+                        <option value="Foreman">Foreman</option>
+                        <option value="Koordinator">Koordinator</option>
+                        <option value="Supervisor">Supervisor</option>
+                        <option value="Manajer">Manajer</option>
+                      </optgroup>
+                      <optgroup label="Grade Golongan Produksi I">
+                        {availableLevels.map((lvl) => (
+                          <option key={lvl} value={lvl}>
+                            Grade {lvl} {selectedStaffForMutasi.level === lvl ? '(Level Saat Ini)' : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <option value="__custom__">➕ Ketik Level / Grade Lainnya...</option>
+                    </select>
+
+                    {isCustomLevel && (
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ketik level/grade kustom..."
+                        value={mutNilaiBaru}
+                        onChange={(e) => setMutNilaiBaru(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border-2 border-amber-500 rounded-lg font-bold text-slate-900 dark:text-white"
+                        autoFocus
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* 3. SEKUP */}
+                {mutJenis === 'Sekup' && (
+                  <select
+                    value={mutNilaiBaru}
+                    onChange={(e) => setMutNilaiBaru(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+                    required
+                  >
+                    <option value="Operasional">Operasional (Pabrik / Unit Produksi)</option>
+                    <option value="Administrasi">Administrasi (Kantor / Support)</option>
+                  </select>
+                )}
+
+                {/* 4. STATUS KEPEGAWAIAN */}
+                {mutJenis === 'Status Kepegawaian' && (
+                  <select
+                    value={mutNilaiBaru}
+                    onChange={(e) => setMutNilaiBaru(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+                    required
+                  >
+                    <option value="TETAP">TETAP (Karyawan Tetap)</option>
+                    <option value="PKWT 1">PKWT 1 (Kontrak Tahap 1)</option>
+                    <option value="PKWT 2">PKWT 2 (Kontrak Tahap 2)</option>
+                    <option value="PKWT 3">PKWT 3 (Kontrak Tahap 3)</option>
+                    <option value="PKWT 4">PKWT 4 (Kontrak Tahap 4)</option>
+                    <option value="PKWT 5">PKWT 5 (Kontrak Tahap 5)</option>
+                    <option value="PKWT 6">PKWT 6 (Kontrak Tahap 6)</option>
+                    <option value="PKWT 7">PKWT 7 (Kontrak Tahap 7)</option>
+                    <option value="MAGANG">MAGANG (Internship / Pelatihan)</option>
+                  </select>
+                )}
+
+                {/* 5. STATUS AKTIF */}
+                {mutJenis === 'Status Aktif' && (
+                  <select
+                    value={mutNilaiBaru}
+                    onChange={(e) => setMutNilaiBaru(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+                    required
+                  >
+                    <option value="Aktif">Aktif (Bekerja Normal)</option>
+                    <option value="Non Aktif">Non Aktif (Resign / Non-Aktif)</option>
+                  </select>
+                )}
+
+                {/* 6. GAJI POKOK */}
+                {mutJenis === 'Gaji Pokok' && (
+                  <div className="space-y-2">
+                    <select
+                      value={isCustomGp ? '__custom__' : mutNilaiBaru}
+                      onChange={(e) => {
+                        if (e.target.value === '__custom__') {
+                          setIsCustomGp(true);
+                          setMutNilaiBaru('');
+                        } else {
+                          setIsCustomGp(false);
+                          setMutNilaiBaru(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+                      required={!isCustomGp}
+                    >
+                      <option value="" disabled>-- Pilih Nominal Gaji Pokok Baru --</option>
+                      {standardGpOptions.map((val) => (
+                        <option key={val} value={val}>
+                          Rp {val.toLocaleString('id-ID')} {selectedStaffForMutasi.gajiPokok === val ? '(Gaji Saat Ini)' : ''}
+                        </option>
+                      ))}
+                      <option value="__custom__">➕ Ketik Nominal Gaji Pokok Kustom...</option>
+                    </select>
+
+                    {isCustomGp && (
+                      <div>
+                        <input
+                          type="number"
+                          min={0}
+                          required
+                          placeholder="Ketik nominal gaji pokok baru (angka saja)..."
+                          value={mutNilaiBaru}
+                          onChange={(e) => setMutNilaiBaru(e.target.value)}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border-2 border-amber-500 rounded-lg font-mono font-bold text-slate-900 dark:text-white"
+                          autoFocus
+                        />
+                        {Boolean(Number(mutNilaiBaru)) && (
+                          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 block">
+                            Pratinjau: Rp {Number(mutNilaiBaru).toLocaleString('id-ID')}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 7. TUNJANGAN JABATAN */}
+                {mutJenis === 'Tunjangan Jabatan' && (
+                  <div className="space-y-2">
+                    <select
+                      value={isCustomTj ? '__custom__' : mutNilaiBaru}
+                      onChange={(e) => {
+                        if (e.target.value === '__custom__') {
+                          setIsCustomTj(true);
+                          setMutNilaiBaru('');
+                        } else {
+                          setIsCustomTj(false);
+                          setMutNilaiBaru(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+                      required={!isCustomTj}
+                    >
+                      <option value="" disabled>-- Pilih Nominal Tunjangan Jabatan Baru --</option>
+                      {standardTjOptions.map((val) => (
+                        <option key={val} value={val}>
+                          Rp {val.toLocaleString('id-ID')} {val === 0 ? '(Tanpa Tunjangan)' : ''} {selectedStaffForMutasi.tunjanganJabatan === val ? '(Saat Ini)' : ''}
+                        </option>
+                      ))}
+                      <option value="__custom__">➕ Ketik Nominal Tunjangan Kustom...</option>
+                    </select>
+
+                    {isCustomTj && (
+                      <div>
+                        <input
+                          type="number"
+                          min={0}
+                          required
+                          placeholder="Ketik nominal tunjangan baru (angka saja)..."
+                          value={mutNilaiBaru}
+                          onChange={(e) => setMutNilaiBaru(e.target.value)}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border-2 border-amber-500 rounded-lg font-mono font-bold text-slate-900 dark:text-white"
+                          autoFocus
+                        />
+                        {Boolean(Number(mutNilaiBaru)) && (
+                          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 block">
+                            Pratinjau: Rp {Number(mutNilaiBaru).toLocaleString('id-ID')}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
-                <label className="block font-semibold mb-1">Keterangan / Alasan Mutasi</label>
+                <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-200">
+                  Keterangan / Alasan Mutasi
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: Promosi jabatan hasil penilaian kinerja Q3..."
+                  placeholder="Contoh: Promosi kenaikan grade hasil evaluasi kinerja tahunan..."
                   value={mutKeterangan}
                   onChange={(e) => setMutKeterangan(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
-              <p className="text-[11px] text-slate-500 italic">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
                 * Jika tanggal efektif adalah di masa depan, mutasi akan berstatus <strong>"Terjadwal"</strong> dan otomatis diterapkan saat tanggal tersebut tiba.
               </p>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedStaffForMutasi(null)}
-                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-semibold"
+                  onClick={handleCloseMutasi}
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-semibold transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shadow-sm"
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shadow-sm transition-colors"
                 >
                   Simpan Mutasi
                 </button>
