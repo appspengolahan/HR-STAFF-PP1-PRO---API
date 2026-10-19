@@ -896,6 +896,7 @@ export default function App() {
           {activeTab === 'database' && (
             <DatabaseStaffTab
               staffList={staffList}
+              mutasiList={mutasiList}
               onAddStaff={handleAddStaff}
               onUpdateStaff={handleUpdateStaff}
               onDeleteStaff={handleDeleteStaff}

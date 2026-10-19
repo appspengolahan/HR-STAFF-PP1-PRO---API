@@ -18,13 +18,14 @@ import {
 import { StaffData, MutasiRecord } from '../../types';
 import { formatRupiah } from '../../services/payrollEngine';
 import { PkwtAlertCard, parsePkwtDate } from '../PkwtAlertCard';
-import { formatTanggalIndo } from '../../utils/dateFormatter';
+import { formatTanggalIndo, formatTanggalDmy } from '../../utils/dateFormatter';
 import { storageService, ColumnVisibilitySettings } from '../../services/storageService';
 import { ColumnSettingsModal } from '../modals/ColumnSettingsModal';
 import { appConfirm } from '../../services/dialogService';
 
 interface DatabaseStaffTabProps {
   staffList: StaffData[];
+  mutasiList?: MutasiRecord[];
   onAddStaff: (staff: StaffData) => void;
   onUpdateStaff: (nip: string, patch: Partial<StaffData>) => void;
   onDeleteStaff: (nip: string) => void;
@@ -36,6 +37,7 @@ interface DatabaseStaffTabProps {
 
 export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
   staffList,
+  mutasiList,
   onAddStaff,
   onUpdateStaff,
   onDeleteStaff,
@@ -116,6 +118,18 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
   const [isCustomLevel, setIsCustomLevel] = useState(false);
   const [isCustomGp, setIsCustomGp] = useState(false);
   const [isCustomTj, setIsCustomTj] = useState(false);
+
+  // Map mutasi terjadwal per staf (nip -> MutasiRecord)
+  const pendingMutasiMap = useMemo(() => {
+    const map = new Map<string, MutasiRecord>();
+    if (!mutasiList) return map;
+    mutasiList.forEach((m) => {
+      if (m.status === 'Terjadwal') {
+        map.set(m.nip, m);
+      }
+    });
+    return map;
+  }, [mutasiList]);
 
   // List Jabatan Terpadu (Dari Data Staf Aktif + Jabatan Resmi Divisi Produksi I)
   const availableJabatans = useMemo(() => {
@@ -437,6 +451,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
       {/* Alert PKWT Segera Berakhir (<= 26 Hari) */}
       <PkwtAlertCard
         staffList={staffList}
+        mutasiList={mutasiList}
         onActionClick={(nip) => {
           const st = staffList.find((s) => s.nip === nip);
           if (st) {
@@ -587,15 +602,51 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                     </td>
                     <td className="py-3 px-3">{st.sekup}</td>
                     <td className="py-3 px-3">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          isTetap
-                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
-                            : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-                        }`}
-                      >
-                        {st.status}
-                      </span>
+                      <div className="flex flex-col items-start gap-1">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            isTetap
+                              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                          }`}
+                        >
+                          {st.status}
+                        </span>
+
+                        {/* Keterangan Rencana Mutasi Terjadwal */}
+                        {(() => {
+                          const pending = pendingMutasiMap.get(st.nip);
+                          if (!pending) return null;
+
+                          let labelText = `Terjadwal: ${pending.nilaiBaru}`;
+                          if (pending.jenisMutasi === 'Status Kepegawaian') {
+                            labelText = `Terjadwal: ${pending.nilaiBaru}`;
+                          } else if (pending.jenisMutasi === 'Jabatan') {
+                            labelText = `Mutasi: ${pending.nilaiBaru}`;
+                          } else if (pending.jenisMutasi === 'Level/Kategori') {
+                            labelText = `Level: ${pending.nilaiBaru}`;
+                          } else if (pending.jenisMutasi === 'Gaji Pokok' || pending.jenisMutasi === 'Tunjangan Jabatan') {
+                            labelText = `Penyesuaian Gaji`;
+                          } else {
+                            labelText = `Mutasi: ${pending.nilaiBaru}`;
+                          }
+
+                          return (
+                            <div
+                              className="flex flex-col items-start gap-0.5"
+                              title={`Mutasi Terjadwal (${pending.jenisMutasi}): ${pending.nilaiLama || '-'} ➜ ${pending.nilaiBaru}\nTanggal Efektif: ${formatTanggalDmy(pending.tanggalEfektif)}\nKeterangan: ${pending.keterangan || '-'}`}
+                            >
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60 shadow-2xs whitespace-nowrap">
+                                <GitPullRequest className="w-2.5 h-2.5 text-blue-500 shrink-0" />
+                                <span>{labelText}</span>
+                              </span>
+                              <span className="text-[9px] text-slate-500 dark:text-slate-400 font-mono pl-0.5 whitespace-nowrap">
+                                Efektif {formatTanggalDmy(pending.tanggalEfektif)}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </td>
                     {columnSettings.showGajiPokok && (
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-700 dark:text-slate-300">

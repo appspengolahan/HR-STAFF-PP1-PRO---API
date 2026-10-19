@@ -1,6 +1,6 @@
 import React from 'react';
-import { AlertTriangle, Clock, ChevronRight } from 'lucide-react';
-import { StaffData } from '../types';
+import { AlertTriangle, Clock, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { StaffData, MutasiRecord } from '../types';
 
 export interface PkwtExpiringItem {
   id: number;
@@ -91,6 +91,7 @@ export function getPkwtExpiringStaff(staffList: StaffData[], maxDays: number = 2
 
 interface PkwtAlertCardProps {
   staffList: StaffData[];
+  mutasiList?: MutasiRecord[];
   onActionClick?: (nip: string) => void;
   actionLabel?: string;
   className?: string;
@@ -98,6 +99,7 @@ interface PkwtAlertCardProps {
 
 export const PkwtAlertCard: React.FC<PkwtAlertCardProps> = ({
   staffList,
+  mutasiList,
   onActionClick,
   actionLabel = 'Perpanjang / Mutasi',
   className = '',
@@ -173,16 +175,40 @@ export const PkwtAlertCard: React.FC<PkwtAlertCardProps> = ({
                     >
                       {st.sisaHari} hari
                     </span>
+                    {(() => {
+                      const pending = mutasiList?.find((m) => m.nip === st.nip && m.status === 'Terjadwal');
+                      if (!pending) return null;
+                      return (
+                        <div className="mt-1 flex items-center justify-center">
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 shadow-2xs"
+                            title={`Perpanjangan/Mutasi Terjadwal: ${pending.nilaiBaru} (Efektif: ${pending.tanggalEfektif})`}
+                          >
+                            <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                            <span>Terjadwal: {pending.nilaiBaru}</span>
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </td>
                   {onActionClick && (
                     <td className="py-3.5 px-4 text-right no-print print:hidden whitespace-nowrap">
-                      <button
-                        onClick={() => onActionClick(st.nip)}
-                        className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs shadow-xs transition-all active:scale-95 cursor-pointer inline-flex items-center gap-1"
-                      >
-                        <span>{actionLabel}</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
+                      {(() => {
+                        const pending = mutasiList?.find((m) => m.nip === st.nip && m.status === 'Terjadwal');
+                        return (
+                          <button
+                            onClick={() => onActionClick(st.nip)}
+                            className={`px-3 py-1.5 rounded-lg text-white font-semibold text-xs shadow-xs transition-all active:scale-95 cursor-pointer inline-flex items-center gap-1 ${
+                              pending
+                                ? 'bg-indigo-600 hover:bg-indigo-700'
+                                : 'bg-amber-500 hover:bg-amber-600'
+                            }`}
+                          >
+                            <span>{pending ? 'Ubah Rencana' : actionLabel}</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        );
+                      })()}
                     </td>
                   )}
                 </tr>
