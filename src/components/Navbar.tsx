@@ -269,7 +269,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onOpenPublicShare}
             title="Buka &amp; Salin tautan Portal Informasi Publik (Linktree)"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 transition-all cursor-pointer select-none text-xs font-semibold shadow-xs"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 transition-all cursor-pointer select-none text-xs font-semibold shadow-xs"
           >
             <Globe className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span className="hidden lg:inline-block">Portal Publik</span>

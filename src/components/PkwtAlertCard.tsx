@@ -129,8 +129,71 @@ export const PkwtAlertCard: React.FC<PkwtAlertCardProps> = ({
         </div>
       </div>
 
-      {/* Table matching user image */}
-      <div className="overflow-x-auto">
+      {/* Mobile Card View (< 640px) */}
+      <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800 p-3 space-y-3">
+        {expiringStaff.map((st) => {
+          const isExpiredOrNegative = st.sisaHari < 0;
+          const isUrgent = st.sisaHari <= 7;
+          const pending = mutasiList?.find((m) => m.nip === st.nip && m.status === 'Terjadwal');
+
+          return (
+            <div key={st.nip} className="pt-3 first:pt-0 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                    {st.nama}
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                    {st.nip} • {st.jabatan}
+                  </div>
+                </div>
+                <span
+                  className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                    isExpiredOrNegative
+                      ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                      : isUrgent
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300'
+                      : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                  }`}
+                >
+                  {st.sisaHari} hari
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-0.5">
+                <span>
+                  Akhir PKWT: <strong className="text-slate-700 dark:text-slate-200 font-mono">{st.akhirPKWT}</strong>
+                </span>
+                {pending && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                    Terjadwal: {pending.nilaiBaru}
+                  </span>
+                )}
+              </div>
+
+              {onActionClick && (
+                <div className="pt-1">
+                  <button
+                    onClick={() => onActionClick(st.nip)}
+                    className={`w-full py-2 px-3 rounded-xl text-white font-bold text-xs shadow-xs transition-all active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer ${
+                      pending
+                        ? 'bg-indigo-600 hover:bg-indigo-700'
+                        : 'bg-amber-500 hover:bg-amber-600'
+                    }`}
+                  >
+                    <span>{pending ? 'Ubah Rencana Mutasi' : actionLabel}</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop / Tablet Table View (>= 640px) */}
+      <div className="overflow-x-auto hidden sm:block">
         <table className="w-full text-xs text-left">
           <thead className="bg-slate-50/80 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800">
             <tr>

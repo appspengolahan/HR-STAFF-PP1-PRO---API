@@ -956,8 +956,8 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
       {/* Modal Ajukan Mutasi Staf */}
       {selectedStaffForMutasi && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 shrink-0">
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-white text-sm">
                   Ajukan Mutasi / Promosi Staf
@@ -974,7 +974,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleApplyMutasi} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleApplyMutasi} className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
               {/* Komparasi Nilai Lama vs Nilai Baru */}
               <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between gap-2">
                 <div className="min-w-0 flex-1">
