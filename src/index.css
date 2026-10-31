@@ -80,7 +80,18 @@
   }
 
   /* 4. Document / Print Paper Specific Styling */
-  #surat-ijin-print-paper,
+  #surat-ijin-print-paper {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: static !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    border: none !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
   #slip-gaji-a4-sheet,
   #thermal-slip-paper {
     display: block !important;

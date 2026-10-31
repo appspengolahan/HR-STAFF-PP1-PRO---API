@@ -678,7 +678,11 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
 
   const selectedStaffData = useMemo(() => {
     if (!selectedRecordForSurat) return null;
-    return staffList.find((s) => s.nip === selectedRecordForSurat.nip) || null;
+    return (
+      staffList.find((s) => s.nip === selectedRecordForSurat.nip) ||
+      staffList.find((s) => s.nama.trim().toLowerCase() === selectedRecordForSurat.nama.trim().toLowerCase()) ||
+      null
+    );
   }, [selectedRecordForSurat, staffList]);
 
   return (
