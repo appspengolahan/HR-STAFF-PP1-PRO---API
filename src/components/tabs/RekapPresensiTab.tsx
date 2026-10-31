@@ -16,6 +16,7 @@ import {
 import { PresensiRecord, StaffData } from '../../types';
 import { NAMA_BULAN_INDO } from '../../services/payrollEngine';
 import { formatTanggalIndo } from '../../utils/dateFormatter';
+import { normalizePresensiRecord } from '../../utils/workHoursUtils';
 
 interface RekapPresensiTabProps {
   presensiList: PresensiRecord[];
@@ -84,14 +85,20 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
     setBulanAkhir(akhir);
   };
 
-  // 1. Calculate annual summary per staff
+  // 1. Normalisasi data presensi secara dinamis untuk mencegah bias data historis
+  // (Sabtu lama 420m dikonversi ke 300m, ijin parsial lama dihitung dengan pemotongan jam istirahat resmi)
+  const normalizedPresensiList = useMemo(() => {
+    return presensiList.map(normalizePresensiRecord);
+  }, [presensiList]);
+
+  // 2. Calculate annual summary per staff
   const staffRekapList = useMemo(() => {
     const list = isStaffPortal
       ? staffList.filter((s) => s.nip === currentUserNip)
       : filterStaffNip ? staffList.filter((s) => s.nip === filterStaffNip) : staffList;
 
     return list.map((st) => {
-      const staffPresensi = presensiList.filter((p) => p.nip === st.nip && p.tahun === filterTahun);
+      const staffPresensi = normalizedPresensiList.filter((p) => p.nip === st.nip && p.tahun === filterTahun);
 
       // Monthly ijin minutes (Jan - Des)
       const bulananMenit: number[] = Array(12).fill(0);
@@ -130,7 +137,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
         pctKehadiran,
       };
     });
-  }, [staffList, presensiList, filterTahun, bulanAwal, bulanAkhir, filterStaffNip, isStaffPortal, currentUserNip]);
+  }, [staffList, normalizedPresensiList, filterTahun, bulanAwal, bulanAkhir, filterStaffNip, isStaffPortal, currentUserNip]);
 
   // Active staff selection identification
   const effectiveNip = isStaffPortal && currentUserNip ? currentUserNip : filterStaffNip;
@@ -138,7 +145,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
     return effectiveNip ? staffList.find((s) => s.nip === effectiveNip) : null;
   }, [staffList, effectiveNip]);
 
-  // 2. Calculate Monthly Trend (Jan - Des) across active staff or filtered individual staff
+  // 3. Calculate Monthly Trend (Jan - Des) across active staff or filtered individual staff
   const monthlyTrendData = useMemo(() => {
     if (effectiveNip) {
       // Individual Staff calculation: standard is 1 staff = 10,440 menit/bulan
@@ -146,7 +153,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
 
       return monthsShort.map((namaPendek, idx) => {
         const bulanNum = idx + 1;
-        const records = presensiList.filter(
+        const records = normalizedPresensiList.filter(
           (p) => p.nip === effectiveNip && p.tahun === filterTahun && p.bulan === bulanNum
         );
         const totalIjinMenit = records.reduce((acc, p) => acc + (p.durasiMenit || 0), 0);
@@ -178,7 +185,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
 
     return monthsShort.map((namaPendek, idx) => {
       const bulanNum = idx + 1;
-      const records = presensiList.filter((p) => p.tahun === filterTahun && p.bulan === bulanNum);
+      const records = normalizedPresensiList.filter((p) => p.tahun === filterTahun && p.bulan === bulanNum);
       const totalIjinMenit = records.reduce((acc, p) => acc + (p.durasiMenit || 0), 0);
       const countIjin = records.length;
       const pctKehadiran = Math.max(
@@ -200,7 +207,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
         pctIjin,
       };
     });
-  }, [presensiList, staffList, filterTahun, effectiveNip]);
+  }, [normalizedPresensiList, staffList, filterTahun, effectiveNip, monthsShort]);
 
   // 3. Active Trend Data Filtered by Selected Month Range (Menjawab filter rentang bulan)
   const activeTrendData = useMemo(() => {

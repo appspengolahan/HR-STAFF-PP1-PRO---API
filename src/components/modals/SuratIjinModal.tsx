@@ -2,6 +2,7 @@ import React from 'react';
 import { X, Printer } from 'lucide-react';
 import { PresensiRecord, StaffData } from '../../types';
 import { formatTanggalIndo, formatTanggalDmy, getNamaHariIndo } from '../../utils/dateFormatter';
+import { normalizePresensiRecord } from '../../utils/workHoursUtils';
 
 interface SuratIjinModalProps {
   isOpen: boolean;
@@ -13,10 +14,12 @@ interface SuratIjinModalProps {
 export const SuratIjinModal: React.FC<SuratIjinModalProps> = ({
   isOpen,
   onClose,
-  record,
+  record: rawRecord,
   staff,
 }) => {
-  if (!isOpen || !record) return null;
+  if (!isOpen || !rawRecord) return null;
+
+  const record = normalizePresensiRecord(rawRecord);
 
   const handlePrint = () => {
     window.print();

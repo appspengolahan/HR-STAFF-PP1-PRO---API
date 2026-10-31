@@ -25,6 +25,11 @@ import { getNamaHariIndo, formatTanggalDmy, getTodayIsoDate } from '../../utils/
 import { storageService, DEFAULT_GAS_API_URL } from '../../services/storageService';
 import { gasClient } from '../../services/gasClient';
 import { appConfirm, appAlert } from '../../services/dialogService';
+import {
+  getWorkScheduleForDate,
+  calculateEffectivePermitMinutes,
+  parseTimeToMinutes,
+} from '../../utils/workHoursUtils';
 
 interface PresensiTabProps {
   presensiList: PresensiRecord[];
@@ -252,17 +257,18 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
     }
   };
 
-  // Helper jadwal jam kerja resmi sesuai ketentuan hari kerja PT Batu Karang
+  // Helper jadwal jam kerja resmi sesuai standar baru PT Batu Karang
   const getStandardWorkingHoursForDate = (dateStr: string) => {
-    const hari = getNamaHariIndo(dateStr);
-    if (hari === 'Sabtu') {
-      return { jamAwal: '08:00', jamAkhir: '13:00', durasiMenit: 300, hari };
-    }
-    if (hari === 'Jumat') {
-      return { jamAwal: '08:00', jamAkhir: '16:30', durasiMenit: 420, hari };
-    }
-    // Senin - Kamis
-    return { jamAwal: '08:00', jamAkhir: '16:00', durasiMenit: 420, hari };
+    const sched = getWorkScheduleForDate(dateStr);
+    return {
+      jamAwal: sched.workStart,
+      jamAkhir: sched.workEnd,
+      durasiMenit: sched.effectiveWorkMinutes,
+      hari: sched.dayName,
+      breakStart: sched.breakStart,
+      breakEnd: sched.breakEnd,
+      breakDurationMinutes: sched.breakDurationMinutes,
+    };
   };
 
   // Handlers for Add Form Sehari Penuh & Tanggal
@@ -304,45 +310,57 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   // Helper hitung selisih jam ke durasi menit secara akurat
   const calculateDurasiMenit = (awal: string, akhir: string): number => {
     if (!awal || !akhir) return 0;
-    const [h1, m1] = awal.split(':').map(Number);
-    const [h2, m2] = akhir.split(':').map(Number);
-    if (isNaN(h1) || isNaN(m1) || isNaN(h2) || isNaN(m2)) return 0;
-    const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+    const m1 = parseTimeToMinutes(awal);
+    const m2 = parseTimeToMinutes(akhir);
+    const diff = m2 - m1;
     return diff > 0 ? diff : 0;
   };
 
-  // Compute Faktor Potongan automatically
-  const computeFaktor = (jenis: string, durasiMenit: number, lampiran: string = 'Tidak'): number => {
-    const j = (jenis || '').trim();
-    if (
-      j === 'Hadir' ||
-      j === 'Sakit (S Dokter)' ||
-      lampiran === 'Ya' ||
-      j === 'Cuti' ||
-      j === 'Cuti Tahunan' ||
-      j === 'Ijin Normatif'
-    ) {
-      return 0;
-    }
-    if (
-      j === 'Sakit (S Tangan)' ||
-      j === 'Ijin (S Tangan)' ||
-      j === 'Alpha' ||
-      j === 'Ijin Tidak Masuk'
-    ) {
-      return 1;
-    }
-    if (
-      j === 'Ijin Terlambat' ||
-      j === 'Ijin Keluar Sementara' ||
-      j === 'Ijin Pulang Awal'
-    ) {
-      if (durasiMenit <= 120) return 0;
-      if (durasiMenit < 240) return 0.5;
-      return 1;
-    }
-    return 0;
+  // Compute Faktor Potongan automatically with break deduction & official schedules
+  const computeFaktor = (
+    jenis: string,
+    durasiMenit: number,
+    lampiran: string = 'Tidak',
+    dateStr?: string,
+    jamAwal?: string,
+    jamAkhir?: string,
+    isFullDay?: boolean
+  ): number => {
+    const targetDate = dateStr || formTglAwal || getTodayIsoDate();
+    const res = calculateEffectivePermitMinutes(
+      targetDate,
+      jamAwal || formJamAwal || '08:00',
+      jamAkhir || formJamAkhir || '16:00',
+      isFullDay ?? formSehariPenuh,
+      jenis,
+      lampiran
+    );
+    return res.faktorPotongan;
   };
+
+  // Live calculation for Form Add
+  const liveFormCalc = useMemo(() => {
+    return calculateEffectivePermitMinutes(
+      formTglAwal || getTodayIsoDate(),
+      formJamAwal || '08:00',
+      formJamAkhir || '16:00',
+      formSehariPenuh,
+      formJenisIjin,
+      formLampiran
+    );
+  }, [formTglAwal, formJamAwal, formJamAkhir, formSehariPenuh, formJenisIjin, formLampiran]);
+
+  // Live calculation for Form Edit
+  const liveEditCalc = useMemo(() => {
+    return calculateEffectivePermitMinutes(
+      editTanggal || getTodayIsoDate(),
+      editJamAwal || '08:00',
+      editJamAkhir || '16:00',
+      editSehariPenuh,
+      editJenisIjin,
+      editLampiranSurat
+    );
+  }, [editTanggal, editJamAwal, editJamAkhir, editSehariPenuh, editJenisIjin, editLampiranSurat]);
 
   const handleOpenEditModal = (rec: PresensiRecord) => {
     setSelectedRecordForEdit(rec);
@@ -360,26 +378,30 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
     setEditJamAwal(rec.jamAwal || '');
     setEditJamAkhir(rec.jamAkhir || '');
 
-    const std = getStandardWorkingHoursForDate(isoDate);
+    const std = getWorkScheduleForDate(isoDate);
+    const jenisStr = String(rec.jenisIjin || '');
     const isFullDay =
-      rec.durasiMenit === std.durasiMenit ||
-      (rec.jamAwal === std.jamAwal && rec.jamAkhir === std.jamAkhir) ||
-      rec.jenisIjin === 'Sakit (S Tangan)' ||
-      rec.jenisIjin === 'Ijin (S Tangan)' ||
-      rec.jenisIjin === 'Alpha';
+      rec.durasiMenit === std.effectiveWorkMinutes ||
+      (rec.jamAwal === std.workStart && rec.jamAkhir === std.workEnd) ||
+      jenisStr === 'Sakit (S Tangan)' ||
+      jenisStr === 'Ijin (S Tangan)' ||
+      jenisStr === 'Alpha' ||
+      jenisStr === 'Ijin Tidak Masuk' ||
+      jenisStr === 'Ijin Normatif';
     setEditSehariPenuh(Boolean(isFullDay));
 
-    // Hitung durasi aktual otomatis dari jamAwal dan jamAkhir jika tersedia
-    let durasi = rec.durasiMenit || 0;
-    if (rec.jamAwal && rec.jamAkhir) {
-      const calculated = calculateDurasiMenit(rec.jamAwal, rec.jamAkhir);
-      if (calculated > 0) {
-        durasi = calculated;
-      }
-    }
-    setEditDurasiMenit(durasi);
+    const calc = calculateEffectivePermitMinutes(
+      isoDate,
+      rec.jamAwal || std.workStart,
+      rec.jamAkhir || std.workEnd,
+      isFullDay,
+      rec.jenisIjin,
+      rec.lampiranSurat
+    );
+
+    setEditDurasiMenit(calc.durasiMenit);
     setEditFaktorPotongan(
-      rec.faktorPotongan !== undefined ? rec.faktorPotongan : computeFaktor(rec.jenisIjin, durasi, rec.lampiranSurat)
+      rec.faktorPotongan !== undefined ? rec.faktorPotongan : calc.faktorPotongan
     );
     setEditKeperluan(rec.keperluan || '');
     setEditLampiranSurat(rec.lampiranSurat || 'Tidak');
@@ -388,23 +410,61 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
 
   const handleEditTanggalChange = (tgl: string) => {
     setEditTanggal(tgl);
+    const std = getWorkScheduleForDate(tgl);
     if (editSehariPenuh && tgl) {
-      const std = getStandardWorkingHoursForDate(tgl);
-      setEditJamAwal(std.jamAwal);
-      setEditJamAkhir(std.jamAkhir);
-      setEditDurasiMenit(std.durasiMenit);
-      setEditFaktorPotongan(computeFaktor(editJenisIjin, std.durasiMenit, editLampiranSurat));
+      setEditJamAwal(std.workStart);
+      setEditJamAkhir(std.workEnd);
+      setEditDurasiMenit(std.effectiveWorkMinutes);
+      const calc = calculateEffectivePermitMinutes(
+        tgl,
+        std.workStart,
+        std.workEnd,
+        true,
+        editJenisIjin,
+        editLampiranSurat
+      );
+      setEditFaktorPotongan(calc.faktorPotongan);
+    } else if (editJamAwal && editJamAkhir) {
+      const calc = calculateEffectivePermitMinutes(
+        tgl,
+        editJamAwal,
+        editJamAkhir,
+        false,
+        editJenisIjin,
+        editLampiranSurat
+      );
+      setEditDurasiMenit(calc.durasiMenit);
+      setEditFaktorPotongan(calc.faktorPotongan);
     }
   };
 
   const handleToggleEditSehariPenuh = (checked: boolean) => {
     setEditSehariPenuh(checked);
     if (checked && editTanggal) {
-      const std = getStandardWorkingHoursForDate(editTanggal);
-      setEditJamAwal(std.jamAwal);
-      setEditJamAkhir(std.jamAkhir);
-      setEditDurasiMenit(std.durasiMenit);
-      setEditFaktorPotongan(computeFaktor(editJenisIjin, std.durasiMenit, editLampiranSurat));
+      const std = getWorkScheduleForDate(editTanggal);
+      setEditJamAwal(std.workStart);
+      setEditJamAkhir(std.workEnd);
+      setEditDurasiMenit(std.effectiveWorkMinutes);
+      const calc = calculateEffectivePermitMinutes(
+        editTanggal,
+        std.workStart,
+        std.workEnd,
+        true,
+        editJenisIjin,
+        editLampiranSurat
+      );
+      setEditFaktorPotongan(calc.faktorPotongan);
+    } else if (editTanggal && editJamAwal && editJamAkhir) {
+      const calc = calculateEffectivePermitMinutes(
+        editTanggal,
+        editJamAwal,
+        editJamAkhir,
+        false,
+        editJenisIjin,
+        editLampiranSurat
+      );
+      setEditDurasiMenit(calc.durasiMenit);
+      setEditFaktorPotongan(calc.faktorPotongan);
     }
   };
 
@@ -418,16 +478,25 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
     const tahun = !isNaN(d.getTime()) ? d.getFullYear() : selectedRecordForEdit.tahun;
     const hari = getNamaHariIndo(editTanggal);
 
+    const calc = calculateEffectivePermitMinutes(
+      editTanggal,
+      editJamAwal,
+      editJamAkhir,
+      editSehariPenuh,
+      editJenisIjin,
+      editLampiranSurat
+    );
+
     const updated: Partial<PresensiRecord> = {
       tanggal: editTanggal,
       hari,
       nip: editStaffNip,
       nama: st?.nama || selectedRecordForEdit.nama,
       jenisIjin: editJenisIjin,
-      jamAwal: editJamAwal,
-      jamAkhir: editJamAkhir,
-      durasiMenit: Number(editDurasiMenit) || 0,
-      faktorPotongan: Number(editFaktorPotongan) || 0,
+      jamAwal: editSehariPenuh ? calc.jamAwal : editJamAwal,
+      jamAkhir: editSehariPenuh ? calc.jamAkhir : editJamAkhir,
+      durasiMenit: Number(editDurasiMenit) || calc.durasiMenit,
+      faktorPotongan: Number(editFaktorPotongan) !== undefined ? Number(editFaktorPotongan) : calc.faktorPotongan,
       keperluan: editKeperluan,
       lampiranSurat: editLampiranSurat,
       catatan: editCatatan,
@@ -529,29 +598,14 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
         const dd = String(cur.getDate()).padStart(2, '0');
         const dateStr = `${yyyy}-${mm}-${dd}`;
 
-        let jamAwal = formJamAwal || '08:00';
-        let jamAkhir = formJamAkhir || '10:00';
-        let durasi = 0;
-
-        if (formSehariPenuh) {
-          if (hariStr === 'Sabtu') {
-            jamAwal = '08:00';
-            jamAkhir = '13:00';
-            durasi = 300;
-          } else if (hariStr === 'Jumat') {
-            jamAwal = '08:00';
-            jamAkhir = '16:30';
-            durasi = 420;
-          } else {
-            jamAwal = '08:00';
-            jamAkhir = '16:00';
-            durasi = 420;
-          }
-        } else {
-          durasi = calculateDurasiMenit(jamAwal, jamAkhir);
-        }
-
-        const faktor = computeFaktor(formJenisIjin, durasi, formLampiran);
+        const calc = calculateEffectivePermitMinutes(
+          dateStr,
+          formJamAwal || '08:00',
+          formJamAkhir || '16:00',
+          formSehariPenuh,
+          formJenisIjin,
+          formLampiran
+        );
 
         recordsToAdd.push({
           id: `pr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -559,14 +613,18 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
           hari: hariStr,
           nip: st.nip,
           nama: st.nama,
-          jamAwal,
-          jamAkhir,
-          durasiMenit: durasi,
+          jamAwal: calc.jamAwal,
+          jamAkhir: calc.jamAkhir,
+          durasiMenit: calc.durasiMenit,
           jenisIjin: formJenisIjin,
-          faktorPotongan: faktor,
+          faktorPotongan: calc.faktorPotongan,
           keperluan: formKeperluan || 'Keperluan Pribadi / Keluarga',
           lampiranSurat: formLampiran,
-          catatan: formCatatan || 'Form Ijin Pengecualian',
+          catatan:
+            formCatatan ||
+            (calc.potonganIstirahatMenit > 0
+              ? `Otomatis dipotong jam istirahat ${calc.potonganIstirahatMenit} mnt`
+              : 'Form Ijin Pengecualian'),
           bulan: cur.getMonth() + 1,
           tahun: cur.getFullYear(),
           shift: st.shiftDefault || 'Shift 1',
@@ -865,7 +923,9 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                             ? '0 (Dibayar)'
                             : row.faktorPotongan === 0.5
                             ? '0,5 (Setengah Hari)'
-                            : '1,0 (Hangus)'}
+                            : row.faktorPotongan === 1
+                            ? '1,0 (Hangus 1 Hari)'
+                            : `${row.faktorPotongan} (${Math.round(row.faktorPotongan * 100)}% Hari)`}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-slate-600 dark:text-slate-300 max-w-xs truncate">
@@ -1146,26 +1206,33 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
               </div>
 
               {formSehariPenuh ? (
-                <div className="p-3 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div className="p-3.5 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                   <div>
                     <div className="font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                      <span>Jadwal Jam Kerja Resmi ({getNamaHariIndo(formTglAwal)}): <strong>{formJamAwal} – {formJamAkhir}</strong></span>
+                      <span>Jadwal Jam Kerja Resmi ({liveFormCalc.dayName}): <strong>{liveFormCalc.jamAwal} – {liveFormCalc.jamAkhir}</strong></span>
                     </div>
-                    <div className="text-[11px] text-blue-700/80 dark:text-blue-300/80 mt-0.5">
-                      Durasi Baku: <strong>{calculateDurasiMenit(formJamAwal, formJamAkhir)} Menit</strong> ({getNamaHariIndo(formTglAwal) === 'Sabtu' ? '5 Jam Kerja' : '7 Jam Kerja Bersih'})
+                    <div className="text-[11px] text-blue-700/80 dark:text-blue-300/80 mt-1 flex flex-wrap items-center gap-x-2">
+                      <span>Durasi Efektif: <strong>{liveFormCalc.durasiMenit} Menit</strong> ({liveFormCalc.dayName === 'Sabtu' ? '5 Jam Kerja' : '7 Jam Kerja Bersih'})</span>
+                      {liveFormCalc.potonganIstirahatMenit > 0 && (
+                        <span className="text-amber-700 dark:text-amber-300 font-medium">
+                          • Jam Istirahat Resmi: <strong>{getWorkScheduleForDate(formTglAwal).breakStart} – {getWorkScheduleForDate(formTglAwal).breakEnd} ({liveFormCalc.potonganIstirahatMenit} mnt)</strong>
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <span className={`px-2 py-0.5 rounded font-bold text-[11px] font-mono self-start sm:self-auto ${
-                    computeFaktor(formJenisIjin, calculateDurasiMenit(formJamAwal, formJamAkhir), formLampiran) > 0
+                  <span className={`px-2.5 py-1 rounded-lg font-bold text-[11px] font-mono self-start sm:self-auto shrink-0 ${
+                    liveFormCalc.faktorPotongan > 0
                       ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
                       : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
                   }`}>
-                    Faktor Potongan: {computeFaktor(formJenisIjin, calculateDurasiMenit(formJamAwal, formJamAkhir), formLampiran) === 0
+                    Faktor Potongan: {liveFormCalc.faktorPotongan === 0
                       ? '0 (Dibayar Penuh)'
-                      : computeFaktor(formJenisIjin, calculateDurasiMenit(formJamAwal, formJamAkhir), formLampiran) === 0.5
+                      : liveFormCalc.faktorPotongan === 0.5
                       ? '0,5 (Potong Setengah Hari)'
-                      : '1,0 (Hangus 1 Hari)'}
+                      : liveFormCalc.faktorPotongan === 1
+                      ? '1,0 (Hangus 1 Hari)'
+                      : `${liveFormCalc.faktorPotongan} (${Math.round(liveFormCalc.faktorPotongan * 100)}% Hari)`}
                   </span>
                 </div>
               ) : (
@@ -1192,21 +1259,38 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                   </div>
 
                   {formJamAwal && formJamAkhir && (
-                    <div className="p-2.5 rounded-lg bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 flex items-center justify-between text-xs">
-                      <div className="text-slate-600 dark:text-slate-300">
-                        Durasi Terhitung Otomatis: <strong className="text-slate-900 dark:text-white font-mono">{calculateDurasiMenit(formJamAwal, formJamAkhir)} Menit</strong>
+                    <div className="p-3 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 space-y-2 text-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                          <span>Durasi Kotor: <strong className="font-mono">{liveFormCalc.durasiBruto} mnt</strong></span>
+                          <span>→</span>
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            Durasi Bersih: <span className="font-mono text-blue-600 dark:text-blue-400 font-bold">{liveFormCalc.durasiMenit} Menit</span>
+                          </span>
+                        </div>
+                        <span className={`px-2.5 py-1 rounded-lg font-bold text-[11px] font-mono ${
+                          liveFormCalc.faktorPotongan > 0
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
+                            : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
+                        }`}>
+                          Faktor Potongan: {liveFormCalc.faktorPotongan === 0
+                            ? '0 (Bebas Potongan / Dibayar Penuh)'
+                            : liveFormCalc.faktorPotongan === 0.5
+                            ? '0,5 (Setengah Hari)'
+                            : liveFormCalc.faktorPotongan === 1
+                            ? '1,0 (Hangus 1 Hari)'
+                            : `${liveFormCalc.faktorPotongan} (${Math.round(liveFormCalc.faktorPotongan * 100)}% Hari)`}
+                        </span>
                       </div>
-                      <span className={`px-2 py-0.5 rounded font-bold text-[11px] font-mono ${
-                        computeFaktor(formJenisIjin, calculateDurasiMenit(formJamAwal, formJamAkhir), formLampiran) > 0
-                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
-                          : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
-                      }`}>
-                        Faktor Potongan: {computeFaktor(formJenisIjin, calculateDurasiMenit(formJamAwal, formJamAkhir), formLampiran) === 0
-                          ? '0 (Dibayar Penuh)'
-                          : computeFaktor(formJenisIjin, calculateDurasiMenit(formJamAwal, formJamAkhir), formLampiran) === 0.5
-                          ? '0,5 (Potong Setengah Hari)'
-                          : '1,0 (Hangus 1 Hari)'}
-                      </span>
+
+                      {liveFormCalc.potonganIstirahatMenit > 0 && (
+                        <div className="text-[11px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 p-2 rounded-lg border border-amber-200 dark:border-amber-800/60 flex items-center gap-1.5 font-medium">
+                          <span>🛡️</span>
+                          <span>
+                            Otomatis memotong jam istirahat resmi <strong>{liveFormCalc.potonganIstirahatMenit} Menit</strong> ({getWorkScheduleForDate(formTglAwal).breakStart} – {getWorkScheduleForDate(formTglAwal).breakEnd}) sehingga tidak membebani ijin staf.
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
@@ -1379,17 +1463,22 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
               </div>
 
               {editSehariPenuh ? (
-                <div className="p-3 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div className="p-3.5 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                   <div>
                     <div className="font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                      <span>Jadwal Jam Kerja Resmi ({getNamaHariIndo(editTanggal)}): <strong>{editJamAwal} – {editJamAkhir}</strong></span>
+                      <span>Jadwal Jam Kerja Resmi ({liveEditCalc.dayName}): <strong>{editJamAwal} – {editJamAkhir}</strong></span>
                     </div>
-                    <div className="text-[11px] text-blue-700/80 dark:text-blue-300/80 mt-0.5">
-                      Durasi Baku: <strong>{editDurasiMenit} Menit</strong> ({getNamaHariIndo(editTanggal) === 'Sabtu' ? '5 Jam Kerja' : '7 Jam Kerja Bersih'})
+                    <div className="text-[11px] text-blue-700/80 dark:text-blue-300/80 mt-1 flex flex-wrap items-center gap-x-2">
+                      <span>Durasi Baku: <strong>{editDurasiMenit} Menit</strong> ({liveEditCalc.dayName === 'Sabtu' ? '5 Jam Kerja' : '7 Jam Kerja Bersih'})</span>
+                      {liveEditCalc.potonganIstirahatMenit > 0 && (
+                        <span className="text-amber-700 dark:text-amber-300 font-medium">
+                          • Jam Istirahat Resmi: <strong>{getWorkScheduleForDate(editTanggal).breakStart} – {getWorkScheduleForDate(editTanggal).breakEnd} ({liveEditCalc.potonganIstirahatMenit} mnt)</strong>
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <span className={`px-2 py-0.5 rounded font-bold text-[11px] font-mono self-start sm:self-auto ${
+                  <span className={`px-2.5 py-1 rounded-lg font-bold text-[11px] font-mono self-start sm:self-auto shrink-0 ${
                     editFaktorPotongan > 0
                       ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
                       : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
@@ -1398,7 +1487,9 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                       ? '0 (Dibayar Penuh)'
                       : editFaktorPotongan === 0.5
                       ? '0,5 (Potong Setengah Hari)'
-                      : '1,0 (Hangus 1 Hari)'}
+                      : editFaktorPotongan === 1
+                      ? '1,0 (Hangus 1 Hari)'
+                      : `${editFaktorPotongan} (${Math.round(editFaktorPotongan * 100)}% Hari)`}
                   </span>
                 </div>
               ) : (
@@ -1415,17 +1506,19 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                           const newAwal = e.target.value;
                           setEditJamAwal(newAwal);
                           if (newAwal && editJamAkhir) {
-                            const dur = calculateDurasiMenit(newAwal, editJamAkhir);
-                            setEditDurasiMenit(dur);
-                            let j = editJenisIjin;
-                            if (newAwal >= '12:00' && (editJamAkhir >= '16:00') && j === 'Ijin Terlambat') {
-                              j = 'Ijin Pulang Awal';
-                              setEditJenisIjin(j);
-                            }
-                            setEditFaktorPotongan(computeFaktor(j, dur, editLampiranSurat));
+                            const calc = calculateEffectivePermitMinutes(
+                              editTanggal,
+                              newAwal,
+                              editJamAkhir,
+                              false,
+                              editJenisIjin,
+                              editLampiranSurat
+                            );
+                            setEditDurasiMenit(calc.durasiMenit);
+                            setEditFaktorPotongan(calc.faktorPotongan);
                           }
                         }}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono text-xs"
                       />
                     </div>
                     <div>
@@ -1439,22 +1532,24 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                           const newAkhir = e.target.value;
                           setEditJamAkhir(newAkhir);
                           if (editJamAwal && newAkhir) {
-                            const dur = calculateDurasiMenit(editJamAwal, newAkhir);
-                            setEditDurasiMenit(dur);
-                            let j = editJenisIjin;
-                            if (editJamAwal >= '12:00' && (newAkhir >= '16:00') && j === 'Ijin Terlambat') {
-                              j = 'Ijin Pulang Awal';
-                              setEditJenisIjin(j);
-                            }
-                            setEditFaktorPotongan(computeFaktor(j, dur, editLampiranSurat));
+                            const calc = calculateEffectivePermitMinutes(
+                              editTanggal,
+                              editJamAwal,
+                              newAkhir,
+                              false,
+                              editJenisIjin,
+                              editLampiranSurat
+                            );
+                            setEditDurasiMenit(calc.durasiMenit);
+                            setEditFaktorPotongan(calc.faktorPotongan);
                           }
                         }}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono text-xs"
                       />
                     </div>
                     <div>
                       <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
-                        Durasi (Menit)
+                        Durasi Bersih (Menit)
                       </label>
                       <input
                         type="number"
@@ -1462,25 +1557,41 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                         onChange={(e) => {
                           const val = Number(e.target.value) || 0;
                           setEditDurasiMenit(val);
-                          setEditFaktorPotongan(computeFaktor(editJenisIjin, val, editLampiranSurat));
                         }}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono text-xs"
                       />
                     </div>
                   </div>
 
                   {/* Informative Auto-calculation banner in edit modal */}
-                  <div className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 text-xs flex items-center justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">
-                      Perhitungan Otomatis: <strong className="font-mono text-slate-900 dark:text-white">{editDurasiMenit} Menit</strong>
-                    </span>
-                    <span className={`px-2.5 py-0.5 rounded font-bold text-[11px] font-mono ${
-                      editFaktorPotongan > 0
-                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
-                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
-                    }`}>
-                      Faktor: {editFaktorPotongan === 0 ? '0 (Dibayar Penuh)' : editFaktorPotongan === 0.5 ? '0,5 (Setengah Hari)' : '1,0 (Hangus 1 Hari)'}
-                    </span>
+                  <div className="p-3 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 text-xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 dark:text-slate-300">
+                        Durasi Kotor: <strong className="font-mono">{liveEditCalc.durasiBruto} mnt</strong> → Durasi Bersih: <strong className="font-mono text-blue-600 dark:text-blue-400 font-bold">{editDurasiMenit} Menit</strong>
+                      </span>
+                      <span className={`px-2.5 py-0.5 rounded-lg font-bold text-[11px] font-mono ${
+                        editFaktorPotongan > 0
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
+                          : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
+                      }`}>
+                        Faktor: {editFaktorPotongan === 0
+                          ? '0 (Dibayar Penuh)'
+                          : editFaktorPotongan === 0.5
+                          ? '0,5 (Setengah Hari)'
+                          : editFaktorPotongan === 1
+                          ? '1,0 (Hangus 1 Hari)'
+                          : `${editFaktorPotongan} (${Math.round(editFaktorPotongan * 100)}% Hari)`}
+                      </span>
+                    </div>
+
+                    {liveEditCalc.potonganIstirahatMenit > 0 && (
+                      <div className="text-[11px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 p-2 rounded-lg border border-amber-200 dark:border-amber-800/60 flex items-center gap-1.5 font-medium">
+                        <span>🛡️</span>
+                        <span>
+                          Otomatis memotong jam istirahat resmi <strong>{liveEditCalc.potonganIstirahatMenit} Menit</strong> ({getWorkScheduleForDate(editTanggal).breakStart} – {getWorkScheduleForDate(editTanggal).breakEnd}).
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
