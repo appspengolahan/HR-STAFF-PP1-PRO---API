@@ -15,7 +15,7 @@ import {
   ChevronRight,
   Award,
 } from 'lucide-react';
-import { StaffData, PresensiRecord, LemburRecord } from '../../types';
+import { StaffData, PresensiRecord, LemburRecord, MutasiRecord } from '../../types';
 import { formatRupiah, NAMA_BULAN_INDO } from '../../services/payrollEngine';
 import { PkwtAlertCard } from '../PkwtAlertCard';
 
@@ -23,6 +23,7 @@ interface DashboardTabProps {
   staffList: StaffData[];
   presensiList: PresensiRecord[];
   lemburList: LemburRecord[];
+  mutasiList?: MutasiRecord[];
   onNavigateTab: (tab: string) => void;
   selectedDept?: 'Semua' | 'Operasional' | 'Administrasi';
 }
@@ -49,6 +50,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   staffList,
   presensiList,
   lemburList,
+  mutasiList,
   onNavigateTab,
   selectedDept = 'Semua',
 }) => {
@@ -154,6 +156,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       {/* Alert PKWT jika ada (<= 26 Hari) */}
       <PkwtAlertCard
         staffList={staffList}
+        mutasiList={mutasiList}
         onActionClick={() => onNavigateTab('mutasi')}
         actionLabel="Perpanjang / Mutasi"
       />

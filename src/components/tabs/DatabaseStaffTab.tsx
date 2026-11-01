@@ -421,7 +421,28 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
       if (mutJenis === 'Jabatan') patch.jabatan = mutNilaiBaru.trim();
       else if (mutJenis === 'Level/Kategori') patch.level = mutNilaiBaru.trim();
       else if (mutJenis === 'Sekup') patch.sekup = mutNilaiBaru as 'Operasional' | 'Administrasi';
-      else if (mutJenis === 'Status Kepegawaian') patch.status = mutNilaiBaru as any;
+      else if (mutJenis === 'Status Kepegawaian') {
+        patch.status = mutNilaiBaru as any;
+        if (mutNilaiBaru === 'TETAP') {
+          patch.akhirPKWT = 'Tidak berlaku (TETAP)';
+          patch.limitPKWT = 'Tidak berlaku (TETAP)';
+        } else if (mutNilaiBaru.startsWith('PKWT')) {
+          const eff = mutTanggal.split('-');
+          if (eff.length === 3) {
+            const startY = parseInt(eff[0], 10);
+            const startM = parseInt(eff[1], 10);
+            const startD = parseInt(eff[2], 10);
+            patch.awalPKWT = `${String(startD).padStart(2, '0')}/${String(startM).padStart(2, '0')}/${startY}`;
+            const nextEndDate = new Date(startY, startM - 1, startD);
+            nextEndDate.setFullYear(nextEndDate.getFullYear() + 1);
+            nextEndDate.setDate(nextEndDate.getDate() - 1);
+            patch.akhirPKWT = `${String(nextEndDate.getDate()).padStart(2, '0')}/${String(nextEndDate.getMonth() + 1).padStart(2, '0')}/${nextEndDate.getFullYear()}`;
+            patch.limitPKWT = '364 hari lagi';
+          }
+        } else if (mutNilaiBaru.match(/^\d{4}-\d{2}-\d{2}$/) || mutNilaiBaru.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+          patch.akhirPKWT = mutNilaiBaru;
+        }
+      }
       else if (mutJenis === 'Status Aktif') patch.statusAktif = mutNilaiBaru as 'Aktif' | 'Non Aktif';
       else if (mutJenis === 'Gaji Pokok') {
         patch.gajiPokok = Number(mutNilaiBaru) || 0;

@@ -318,6 +318,54 @@ export default function App() {
     }
   }, [themeMode]);
 
+  // Helper to apply mutasi values to staff data (including automatic PKWT extension)
+  const applyMutasiRecordToStaff = (staff: StaffData, mut: MutasiRecord) => {
+    if (mut.jenisMutasi === 'Jabatan') staff.jabatan = mut.nilaiBaru;
+    else if (mut.jenisMutasi === 'Level/Kategori') staff.level = mut.nilaiBaru;
+    else if (mut.jenisMutasi === 'Sekup') staff.sekup = mut.nilaiBaru as any;
+    else if (mut.jenisMutasi === 'Status Kepegawaian') {
+      staff.status = mut.nilaiBaru as any;
+      if (mut.nilaiBaru === 'TETAP') {
+        staff.akhirPKWT = 'Tidak berlaku (TETAP)';
+        staff.limitPKWT = 'Tidak berlaku (TETAP)';
+      } else if (mut.nilaiBaru.startsWith('PKWT')) {
+        // Otomatis perpanjang masa kontrak 1 tahun dari tanggal efektif
+        const eff = mut.tanggalEfektif.includes('-')
+          ? mut.tanggalEfektif.split('-')
+          : mut.tanggalEfektif.includes('/')
+          ? mut.tanggalEfektif.split('/').reverse()
+          : null;
+        let startD = 1,
+          startM = 11,
+          startY = 2026;
+        if (eff && eff.length === 3) {
+          startY = parseInt(eff[0], 10);
+          startM = parseInt(eff[1], 10);
+          startD = parseInt(eff[2], 10);
+        }
+        staff.awalPKWT = `${String(startD).padStart(2, '0')}/${String(startM).padStart(2, '0')}/${startY}`;
+
+        const nextEndDate = new Date(startY, startM - 1, startD);
+        nextEndDate.setFullYear(nextEndDate.getFullYear() + 1);
+        nextEndDate.setDate(nextEndDate.getDate() - 1);
+        const endD = String(nextEndDate.getDate()).padStart(2, '0');
+        const endM = String(nextEndDate.getMonth() + 1).padStart(2, '0');
+        const endY = nextEndDate.getFullYear();
+        staff.akhirPKWT = `${endD}/${endM}/${endY}`;
+        staff.limitPKWT = '364 hari lagi';
+      } else if (mut.nilaiBaru.match(/^\d{4}-\d{2}-\d{2}$/) || mut.nilaiBaru.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+        staff.akhirPKWT = mut.nilaiBaru;
+      }
+    } else if (mut.jenisMutasi === 'Status Aktif') staff.statusAktif = mut.nilaiBaru as any;
+    else if (mut.jenisMutasi === 'Gaji Pokok') {
+      staff.gajiPokok = Number(mut.nilaiBaru) || 0;
+      staff.totalGaji = staff.gajiPokok + (staff.tunjanganJabatan || 0);
+    } else if (mut.jenisMutasi === 'Tunjangan Jabatan') {
+      staff.tunjanganJabatan = Number(mut.nilaiBaru) || 0;
+      staff.totalGaji = (staff.gajiPokok || 0) + staff.tunjanganJabatan;
+    }
+  };
+
   // Handle Automatic Due Mutation Application
   const handleApplyDueMutations = (silent = false) => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -335,18 +383,7 @@ export default function App() {
         // Apply to staff
         const sIdx = updatedStaff.findIndex((s) => s.nip === m.nip);
         if (sIdx !== -1) {
-          if (m.jenisMutasi === 'Jabatan') updatedStaff[sIdx].jabatan = m.nilaiBaru;
-          else if (m.jenisMutasi === 'Level/Kategori') updatedStaff[sIdx].level = m.nilaiBaru;
-          else if (m.jenisMutasi === 'Sekup') updatedStaff[sIdx].sekup = m.nilaiBaru as any;
-          else if (m.jenisMutasi === 'Status Kepegawaian') updatedStaff[sIdx].status = m.nilaiBaru as any;
-          else if (m.jenisMutasi === 'Status Aktif') updatedStaff[sIdx].statusAktif = m.nilaiBaru as any;
-          else if (m.jenisMutasi === 'Gaji Pokok') {
-            updatedStaff[sIdx].gajiPokok = Number(m.nilaiBaru) || 0;
-            updatedStaff[sIdx].totalGaji = updatedStaff[sIdx].gajiPokok + (updatedStaff[sIdx].tunjanganJabatan || 0);
-          } else if (m.jenisMutasi === 'Tunjangan Jabatan') {
-            updatedStaff[sIdx].tunjanganJabatan = Number(m.nilaiBaru) || 0;
-            updatedStaff[sIdx].totalGaji = (updatedStaff[sIdx].gajiPokok || 0) + updatedStaff[sIdx].tunjanganJabatan;
-          }
+          applyMutasiRecordToStaff(updatedStaff[sIdx], m);
         }
       }
     });
@@ -649,18 +686,7 @@ export default function App() {
       const staffCurrent = storageService.getStaffList();
       const sIdx = staffCurrent.findIndex((s) => s.nip === target.nip);
       if (sIdx !== -1) {
-        if (target.jenisMutasi === 'Jabatan') staffCurrent[sIdx].jabatan = target.nilaiBaru;
-        else if (target.jenisMutasi === 'Level/Kategori') staffCurrent[sIdx].level = target.nilaiBaru;
-        else if (target.jenisMutasi === 'Sekup') staffCurrent[sIdx].sekup = target.nilaiBaru as any;
-        else if (target.jenisMutasi === 'Status Kepegawaian') staffCurrent[sIdx].status = target.nilaiBaru as any;
-        else if (target.jenisMutasi === 'Status Aktif') staffCurrent[sIdx].statusAktif = target.nilaiBaru as any;
-        else if (target.jenisMutasi === 'Gaji Pokok') {
-          staffCurrent[sIdx].gajiPokok = Number(target.nilaiBaru) || 0;
-          staffCurrent[sIdx].totalGaji = staffCurrent[sIdx].gajiPokok + (staffCurrent[sIdx].tunjanganJabatan || 0);
-        } else if (target.jenisMutasi === 'Tunjangan Jabatan') {
-          staffCurrent[sIdx].tunjanganJabatan = Number(target.nilaiBaru) || 0;
-          staffCurrent[sIdx].totalGaji = (staffCurrent[sIdx].gajiPokok || 0) + staffCurrent[sIdx].tunjanganJabatan;
-        }
+        applyMutasiRecordToStaff(staffCurrent[sIdx], target);
         storageService.saveStaffList(staffCurrent);
         setStaffList(staffCurrent);
         appAlert(`Mutasi ${target.jenisMutasi} untuk ${target.nama} (${target.nip}) berhasil diterapkan ke database.`);
@@ -828,6 +854,7 @@ export default function App() {
               staffList={staffList}
               presensiList={presensiList}
               lemburList={lemburList}
+              mutasiList={mutasiList}
               onNavigateTab={setActiveTab}
             />
           )}

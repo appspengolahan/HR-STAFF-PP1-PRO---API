@@ -53,7 +53,11 @@ export function parsePkwtDate(str?: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-export function getPkwtExpiringStaff(staffList: StaffData[], maxDays: number = 26): PkwtExpiringItem[] {
+export function getPkwtExpiringStaff(
+  staffList: StaffData[],
+  maxDays: number = 26,
+  mutasiList?: MutasiRecord[]
+): PkwtExpiringItem[] {
   // Use today reference (ignoring hours)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -63,6 +67,48 @@ export function getPkwtExpiringStaff(staffList: StaffData[], maxDays: number = 2
   staffList.forEach((st) => {
     // Only non-TETAP, active staff with akhirPKWT defined
     if (st.statusAktif === 'Aktif' && st.status !== 'TETAP' && st.akhirPKWT) {
+      // Periksa apakah staf ini sudah memiliki mutasi perpanjangan/pengangkatan yang berstatus 'Diterapkan'
+      if (mutasiList && mutasiList.length > 0) {
+        const appliedMutasi = mutasiList.filter(
+          (m) =>
+            m.nip === st.nip &&
+            m.status === 'Diterapkan' &&
+            (m.jenisMutasi === 'Status Kepegawaian' || m.jenisMutasi === 'Akhir PKWT')
+        );
+
+        const hasAppliedExtension = appliedMutasi.some((m) => {
+          if (m.nilaiBaru === 'TETAP') return true;
+          // Format tanggal ISO/DMY perpanjangan di masa depan
+          if (m.nilaiBaru.match(/^\d{4}-\d{2}-\d{2}$/) || m.nilaiBaru.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+            const extDate = parsePkwtDate(m.nilaiBaru);
+            if (extDate && extDate.getTime() > today.getTime() + maxDays * 24 * 60 * 60 * 1000) {
+              return true;
+            }
+          }
+          // Perpanjangan jenjang PKWT (misal PKWT 4, PKWT 5) dengan tanggal efektif
+          if (m.nilaiBaru.startsWith('PKWT')) {
+            const effDate = parsePkwtDate(m.tanggalEfektif);
+            const curEndDate = parsePkwtDate(st.akhirPKWT);
+            if (effDate && curEndDate) {
+              // Jika mutasi efektifnya berdekatan atau setelah akhir PKWT lama, maka status sudah diperpanjang
+              const diffDays = Math.round((effDate.getTime() - curEndDate.getTime()) / (1000 * 60 * 60 * 24));
+              if (diffDays >= -7) {
+                return true;
+              }
+            } else if (effDate && effDate.getTime() <= today.getTime() + 7 * 24 * 60 * 60 * 1000) {
+              // Sudah efektif diterapkan
+              return true;
+            }
+          }
+          return false;
+        });
+
+        if (hasAppliedExtension) {
+          // Staf sudah resmi diperpanjang / diangkat, jangan tampilkan dalam alert PKWT berakhir
+          return;
+        }
+      }
+
       const date = parsePkwtDate(st.akhirPKWT);
       if (date) {
         date.setHours(0, 0, 0, 0);
@@ -104,7 +150,7 @@ export const PkwtAlertCard: React.FC<PkwtAlertCardProps> = ({
   actionLabel = 'Perpanjang / Mutasi',
   className = '',
 }) => {
-  const expiringStaff = getPkwtExpiringStaff(staffList, 26);
+  const expiringStaff = getPkwtExpiringStaff(staffList, 26, mutasiList);
 
   if (expiringStaff.length === 0) {
     return null;

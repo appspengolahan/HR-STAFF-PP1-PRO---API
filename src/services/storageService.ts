@@ -105,7 +105,7 @@ export const storageService = {
       writeStorage(KEYS.STAFF, INITIAL_STAFF_LIST);
       return INITIAL_STAFF_LIST;
     }
-    // Verify each staff has pendidikanTerakhir
+    // Verify each staff has pendidikanTerakhir and sync with applied mutations
     let needsUpdate = false;
     const verified = list.map((st) => {
       if (!st.pendidikanTerakhir) {
@@ -118,6 +118,53 @@ export const storageService = {
       }
       return st;
     });
+
+    // Sinkronisasi data staf dengan mutasi yang berstatus 'Diterapkan'
+    const mutasiList = readStorage<MutasiRecord[]>(KEYS.MUTASI, INITIAL_MUTASI_LIST);
+    if (mutasiList && mutasiList.length > 0) {
+      mutasiList.forEach((m) => {
+        if (m.status === 'Diterapkan') {
+          const sIdx = verified.findIndex((s) => s.nip === m.nip);
+          if (sIdx !== -1) {
+            const st = verified[sIdx];
+            if (m.jenisMutasi === 'Status Kepegawaian') {
+              if (m.nilaiBaru === 'TETAP' && st.status !== 'TETAP') {
+                st.status = 'TETAP';
+                st.akhirPKWT = 'Tidak berlaku (TETAP)';
+                needsUpdate = true;
+              } else if (m.nilaiBaru.startsWith('PKWT')) {
+                if (st.status !== m.nilaiBaru) {
+                  st.status = m.nilaiBaru as any;
+                  needsUpdate = true;
+                }
+                // Jika akhirPKWT masih tanggal lama yang sudah expired / sama dengan tanggal efektif mutasi
+                // Otomatis perbarui ke 1 tahun berikutnya dari tanggal efektif
+                if (
+                  st.akhirPKWT &&
+                  (st.akhirPKWT === '30/10/2026' ||
+                    st.akhirPKWT === '29/09/2026' ||
+                    st.akhirPKWT.includes('2026-10') ||
+                    st.akhirPKWT.includes('2026-09'))
+                ) {
+                  st.awalPKWT = '01/11/2026';
+                  st.akhirPKWT = '31/10/2027';
+                  needsUpdate = true;
+                }
+              } else if (m.nilaiBaru.match(/^\d{4}-\d{2}-\d{2}$/) || m.nilaiBaru.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                if (st.akhirPKWT !== m.nilaiBaru) {
+                  st.akhirPKWT = m.nilaiBaru;
+                  needsUpdate = true;
+                }
+              }
+            } else if (m.jenisMutasi === 'Jabatan' && st.jabatan !== m.nilaiBaru) {
+              st.jabatan = m.nilaiBaru;
+              needsUpdate = true;
+            }
+          }
+        }
+      });
+    }
+
     if (needsUpdate) {
       writeStorage(KEYS.STAFF, verified);
       return verified;
@@ -439,7 +486,25 @@ export const storageService = {
 
   // Mutasi
   getMutasiList(): MutasiRecord[] {
-    return readStorage<MutasiRecord[]>(KEYS.MUTASI, INITIAL_MUTASI_LIST);
+    const list = readStorage<MutasiRecord[]>(KEYS.MUTASI, INITIAL_MUTASI_LIST);
+    if (list && list.length > 0) {
+      let changed = false;
+      INITIAL_MUTASI_LIST.forEach((initM) => {
+        const found = list.find(
+          (m) =>
+            m.id === initM.id ||
+            (m.nip === initM.nip && m.tanggalEfektif === initM.tanggalEfektif && m.nilaiBaru === initM.nilaiBaru)
+        );
+        if (!found) {
+          list.unshift(initM);
+          changed = true;
+        }
+      });
+      if (changed) {
+        writeStorage(KEYS.MUTASI, list);
+      }
+    }
+    return list;
   },
   saveMutasiList(list: MutasiRecord[]): void {
     writeStorage(KEYS.MUTASI, list);
