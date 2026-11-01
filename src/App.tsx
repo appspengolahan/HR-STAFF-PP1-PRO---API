@@ -97,6 +97,7 @@ export default function App() {
   });
 
   const [isPublicShareModalOpen, setIsPublicShareModalOpen] = useState(false);
+  const [loginGateInitialGate, setLoginGateInitialGate] = useState<'management' | 'staff'>('management');
 
   const handleOpenPublicPortal = () => {
     setIsPublicView(true);
@@ -105,11 +106,12 @@ export default function App() {
     window.history.pushState({}, '', url.toString());
   };
 
-  const handleBackToLoginFromPublic = () => {
+  const handleBackToLoginFromPublic = (gate: 'management' | 'staff' = 'staff') => {
     setIsPublicView(false);
     const url = new URL(window.location.href);
     url.searchParams.delete('view');
     window.history.pushState({}, '', url.pathname);
+    setLoginGateInitialGate(gate);
     setIsLoginModalOpen(true);
   };
 
@@ -398,7 +400,7 @@ export default function App() {
       setIsDevSupervisorVisible(true);
     }
     if (user.portalType === 'staff') {
-      setActiveTab('slip');
+      setActiveTab('presensi');
     } else {
       setActiveTab('dashboard');
     }
@@ -839,6 +841,7 @@ export default function App() {
               onUpdatePresensi={handleUpdatePresensi}
               onDeletePresensi={handleDeletePresensi}
               currentUserNip={currentUser?.nip}
+              currentUser={currentUser}
               isStaffPortal={currentUser?.portalType === 'staff'}
               onSyncPresensi={() => handleSyncPresensiLive(false)}
               isSyncing={isSyncingPresensi}
@@ -1066,6 +1069,7 @@ export default function App() {
         onCloseSecretDoorTrigger={() => setSecretDoorTriggered(false)}
         onUnlockDeveloperMode={() => setIsDevSupervisorVisible(true)}
         onOpenPublicPortal={handleOpenPublicPortal}
+        initialGate={loginGateInitialGate}
       />
 
       {/* Brand & Logo In-App Customizer Modal */}

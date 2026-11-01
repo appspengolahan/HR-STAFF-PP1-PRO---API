@@ -18,7 +18,7 @@ import {
   ChevronDown,
   UploadCloud,
 } from 'lucide-react';
-import { PresensiRecord, StaffData, JenisIjin } from '../../types';
+import { PresensiRecord, StaffData, JenisIjin, AuthUser } from '../../types';
 import { NAMA_BULAN_INDO } from '../../services/payrollEngine';
 import { SuratIjinModal } from '../modals/SuratIjinModal';
 import { getNamaHariIndo, formatTanggalDmy, getTodayIsoDate } from '../../utils/dateFormatter';
@@ -39,6 +39,7 @@ interface PresensiTabProps {
   onUpdatePresensi?: (id: string, updatedRec: Partial<PresensiRecord>) => void;
   onDeletePresensi: (id: string) => void;
   currentUserNip?: string;
+  currentUser?: AuthUser | null;
   isStaffPortal?: boolean;
   onSyncPresensi?: () => Promise<void>;
   isSyncing?: boolean;
@@ -63,6 +64,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   onUpdatePresensi,
   onDeletePresensi,
   currentUserNip,
+  currentUser,
   isStaffPortal = false,
   onSyncPresensi,
   isSyncing = false,
@@ -72,6 +74,16 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   const [filterTahun, setFilterTahun] = useState<number>(now.getFullYear());
   const [filterNama, setFilterNama] = useState<string>(isStaffPortal && currentUserNip ? currentUserNip : '');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Identifikasi objek staf pengguna yang sedang login di portal mandiri
+  const currentUserStaff = useMemo(() => {
+    if (!isStaffPortal) return null;
+    return (
+      staffList.find((s) => s.nip === currentUserNip) ||
+      staffList.find((s) => currentUser?.nama && s.nama.trim().toLowerCase() === currentUser.nama.trim().toLowerCase()) ||
+      null
+    );
+  }, [isStaffPortal, staffList, currentUserNip, currentUser]);
 
   // Form State
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -522,7 +534,9 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
         const matchBulan = item.bulan === filterBulan;
         const matchTahun = item.tahun === filterTahun;
         const matchStaff = isStaffPortal
-          ? item.nip === currentUserNip
+          ? item.nip === currentUserNip ||
+            (currentUserStaff && item.nip === currentUserStaff.nip) ||
+            (currentUser?.nama && item.nama.trim().toLowerCase() === currentUser.nama.trim().toLowerCase())
           : filterNama ? item.nip === filterNama : true;
         const q = searchQuery.trim().toLowerCase();
         const matchSearch = q
@@ -544,12 +558,15 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
         if (diff !== 0) return diff;
         return (b.rowNum || 0) - (a.rowNum || 0);
       });
-  }, [presensiList, filterBulan, filterTahun, filterNama, searchQuery, isStaffPortal, currentUserNip]);
+  }, [presensiList, filterBulan, filterTahun, filterNama, searchQuery, isStaffPortal, currentUserNip, currentUserStaff, currentUser]);
 
   const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
-    let st = staffList.find((s) => s.nip === formStaffNip);
+    let st = isStaffPortal
+      ? currentUserStaff || staffList.find((s) => s.nip === currentUserNip) || null
+      : staffList.find((s) => s.nip === formStaffNip);
+
     if (!st && staffSearchQuery.trim()) {
       const q = staffSearchQuery.trim().toLowerCase();
       const matched = staffList.filter(
@@ -1051,135 +1068,156 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                 </div>
               )}
 
-              {/* Karyawan Staf: Mode Saran (Searchable & Hanya Nama) */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold">
-                    Karyawan Staf <span className="text-red-500">*</span>
+              {/* Karyawan Staf: Terkunci pada Portal Mandiri / Mode Saran untuk HR/Admin */}
+              {isStaffPortal ? (
+                <div>
+                  <label className="block font-semibold mb-1 text-xs text-slate-700 dark:text-slate-300">
+                    Pemohon Ijin Mandiri <span className="text-emerald-500 font-bold">(Akun Terverifikasi)</span>
                   </label>
-                  <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 px-2 py-0.5 rounded-full">
-                    Mode Saran (Ketik Nama)
-                  </span>
-                </div>
-
-                <div ref={staffDropdownRef} className="relative">
-                  <div className="relative flex items-center">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
-                    <input
-                      ref={staffInputRef}
-                      type="text"
-                      value={staffSearchQuery}
-                      onChange={(e) => {
-                        setStaffSearchQuery(e.target.value);
-                        setFormStaffNip('');
-                        setHighlightedStaffIdx(0);
-                        if (!isStaffDropdownOpen) setIsStaffDropdownOpen(true);
-                      }}
-                      onFocus={() => {
-                        setIsStaffDropdownOpen(true);
-                      }}
-                      onKeyDown={handleStaffKeyDown}
-                      placeholder="Ketik nama karyawan staf..."
-                      className="w-full pl-8 pr-16 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    />
-
-                    <div className="absolute right-2 flex items-center gap-1">
-                      {staffSearchQuery && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setStaffSearchQuery('');
-                            setFormStaffNip('');
-                            setIsStaffDropdownOpen(true);
-                            staffInputRef.current?.focus();
-                          }}
-                          className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-md transition-colors cursor-pointer"
-                          title="Bersihkan teks"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setIsStaffDropdownOpen(!isStaffDropdownOpen)}
-                        className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-md transition-colors cursor-pointer"
-                        title="Buka daftar pilihan"
-                      >
-                        <ChevronDown
-                          className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                            isStaffDropdownOpen ? 'rotate-180 text-blue-600' : ''
-                          }`}
-                        />
-                      </button>
+                  <div className="p-3.5 bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-xl flex items-center justify-between gap-3 shadow-xs">
+                    <div className="min-w-0">
+                      <div className="font-bold text-xs text-emerald-950 dark:text-emerald-200 truncate">
+                        {currentUserStaff?.nama || currentUser?.nama}
+                      </div>
+                      <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-mono mt-0.5 truncate">
+                        NIP: {currentUserStaff?.nip || currentUserNip} • Jabatan: {currentUserStaff?.jabatan || 'Staf'} • Sekup: {currentUserStaff?.sekup || 'Operasional'}
+                      </div>
                     </div>
+                    <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-600 text-white shrink-0 shadow-xs">
+                      Portal Mandiri
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold">
+                      Karyawan Staf <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 px-2 py-0.5 rounded-full">
+                      Mode Saran (Ketik Nama)
+                    </span>
                   </div>
 
-                  {/* Suggestions Popover List - HANYA NAMA */}
-                  {isStaffDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 animate-in fade-in slide-in-from-top-1 duration-150">
-                      <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-950/60 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider sticky top-0 backdrop-blur-xs flex items-center justify-between">
-                        <span>Pilih Nama Karyawan</span>
-                        <span>{staffSuggestions.length} staf</span>
+                  <div ref={staffDropdownRef} className="relative">
+                    <div className="relative flex items-center">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+                      <input
+                        ref={staffInputRef}
+                        type="text"
+                        value={staffSearchQuery}
+                        onChange={(e) => {
+                          setStaffSearchQuery(e.target.value);
+                          setFormStaffNip('');
+                          setHighlightedStaffIdx(0);
+                          if (!isStaffDropdownOpen) setIsStaffDropdownOpen(true);
+                        }}
+                        onFocus={() => {
+                          setIsStaffDropdownOpen(true);
+                        }}
+                        onKeyDown={handleStaffKeyDown}
+                        placeholder="Ketik nama karyawan staf..."
+                        className="w-full pl-8 pr-16 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+
+                      <div className="absolute right-2 flex items-center gap-1">
+                        {staffSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStaffSearchQuery('');
+                              setFormStaffNip('');
+                              setIsStaffDropdownOpen(true);
+                              staffInputRef.current?.focus();
+                            }}
+                            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-md transition-colors cursor-pointer"
+                            title="Bersihkan teks"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setIsStaffDropdownOpen(!isStaffDropdownOpen)}
+                          className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-md transition-colors cursor-pointer"
+                          title="Buka daftar pilihan"
+                        >
+                          <ChevronDown
+                            className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                              isStaffDropdownOpen ? 'rotate-180 text-blue-600' : ''
+                            }`}
+                          />
+                        </button>
                       </div>
-
-                      {staffSuggestions.length === 0 ? (
-                        <div className="px-3 py-4 text-center text-slate-400 text-xs">
-                          Tidak ditemukan nama staf "{staffSearchQuery}"
-                        </div>
-                      ) : (
-                        staffSuggestions.map((st, idx) => {
-                          const isSelected = formStaffNip === st.nip;
-                          const isHighlighted = idx === highlightedStaffIdx;
-                          return (
-                            <button
-                              key={st.nip}
-                              type="button"
-                              onClick={() => handleSelectStaff(st)}
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                handleSelectStaff(st);
-                              }}
-                              onMouseEnter={() => setHighlightedStaffIdx(idx)}
-                              className={`w-full px-3 py-2 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer text-xs ${
-                                isSelected
-                                  ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold'
-                                  : isHighlighted
-                                  ? 'bg-slate-100 dark:bg-slate-800/70 text-slate-900 dark:text-white'
-                                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2.5 truncate">
-                                <div
-                                  className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-[10px] shrink-0 ${
-                                    isSelected
-                                      ? 'bg-blue-600 text-white'
-                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                                  }`}
-                                >
-                                  {st.nama.charAt(0).toUpperCase()}
-                                </div>
-                                <span className="truncate font-medium">{st.nama}</span>
-                              </div>
-
-                              {isSelected && (
-                                <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                              )}
-                            </button>
-                          );
-                        })
-                      )}
                     </div>
+
+                    {/* Suggestions Popover List - HANYA NAMA */}
+                    {isStaffDropdownOpen && (
+                      <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 animate-in fade-in slide-in-from-top-1 duration-150">
+                        <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-950/60 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider sticky top-0 backdrop-blur-xs flex items-center justify-between">
+                          <span>Pilih Nama Karyawan</span>
+                          <span>{staffSuggestions.length} staf</span>
+                        </div>
+
+                        {staffSuggestions.length === 0 ? (
+                          <div className="px-3 py-4 text-center text-slate-400 text-xs">
+                            Tidak ditemukan nama staf "{staffSearchQuery}"
+                          </div>
+                        ) : (
+                          staffSuggestions.map((st, idx) => {
+                            const isSelected = formStaffNip === st.nip;
+                            const isHighlighted = idx === highlightedStaffIdx;
+                            return (
+                              <button
+                                key={st.nip}
+                                type="button"
+                                onClick={() => handleSelectStaff(st)}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleSelectStaff(st);
+                                }}
+                                onMouseEnter={() => setHighlightedStaffIdx(idx)}
+                                className={`w-full px-3 py-2 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer text-xs ${
+                                  isSelected
+                                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold'
+                                    : isHighlighted
+                                    ? 'bg-slate-100 dark:bg-slate-800/70 text-slate-900 dark:text-white'
+                                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 truncate">
+                                  <div
+                                    className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-[10px] shrink-0 ${
+                                      isSelected
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                    }`}
+                                  >
+                                    {st.nama.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="truncate font-medium">{st.nama}</span>
+                                </div>
+
+                                {isSelected && (
+                                  <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Selected notification chip */}
+                  {formStaffNip && (
+                    <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Terpilih: <strong>{staffList.find((s) => s.nip === formStaffNip)?.nama}</strong>
+                    </p>
                   )}
                 </div>
-
-                {/* Selected notification chip */}
-                {formStaffNip && (
-                  <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Terpilih: <strong>{staffList.find((s) => s.nip === formStaffNip)?.nama}</strong>
-                  </p>
-                )}
-              </div>
+              )}
 
               <div>
                 <label className="block font-semibold mb-1">Jenis Ijin</label>

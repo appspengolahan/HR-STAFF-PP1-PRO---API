@@ -55,10 +55,17 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
   // 3. Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSekup, setSelectedSekup] = useState<'Semua' | 'Operasional' | 'Administrasi'>('Semua');
+  const [subFilterTidakHadir, setSubFilterTidakHadir] = useState<'Semua' | 'Sakit' | 'Izin' | 'Cuti' | 'Belum Hadir'>('Semua');
   const [selectedBulanRekap, setSelectedBulanRekap] = useState<string>(() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   });
+
+  // Check if selected date is Sunday
+  const isSunday = useMemo(() => {
+    const d = new Date(selectedDate);
+    return !isNaN(d.getTime()) && d.getDay() === 0;
+  }, [selectedDate]);
 
   // Copy feedback state
   const [isCopied, setIsCopied] = useState(false);
@@ -122,9 +129,15 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
         let jamPulang = '-';
         let keterangan = '-';
 
+        let jamRentang = '-';
         if (rec) {
           jamMasuk = rec.jamAwal || '-';
           jamPulang = rec.jamAkhir || '-';
+          if (rec.jamAwal && rec.jamAkhir && rec.jamAwal !== '-' && rec.jamAkhir !== '-') {
+            jamRentang = `${rec.jamAwal} – ${rec.jamAkhir}`;
+          } else if (rec.jamAwal && rec.jamAwal !== '-') {
+            jamRentang = rec.jamAwal;
+          }
           const ji = (rec.jenisIjin || '').toLowerCase();
 
           if (ji.includes('sakit')) {
@@ -157,6 +170,7 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
           status,
           jamMasuk,
           jamPulang,
+          jamRentang,
           keterangan,
         };
       })
@@ -193,10 +207,22 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
     return { hadir, sakit, ijin, cuti, belumCatat, totalFiltered, rate };
   }, [dailyAttendanceList]);
 
-  // Staff on Leave / Permit today
-  const staffOnLeave = useMemo(() => {
-    return dailyAttendanceList.filter((s) => s.status === 'SAKIT' || s.status === 'IJIN' || s.status === 'CUTI');
+  // Staf yang tidak hadir pada hari terpilih
+  const staffTidakHadir = useMemo(() => {
+    return dailyAttendanceList.filter((s) => s.status !== 'HADIR');
   }, [dailyAttendanceList]);
+
+  // Subfilter staf tidak hadir
+  const filteredTidakHadir = useMemo(() => {
+    return staffTidakHadir.filter((s) => {
+      if (subFilterTidakHadir === 'Semua') return true;
+      if (subFilterTidakHadir === 'Sakit') return s.status === 'SAKIT';
+      if (subFilterTidakHadir === 'Izin') return s.status === 'IJIN';
+      if (subFilterTidakHadir === 'Cuti') return s.status === 'CUTI';
+      if (subFilterTidakHadir === 'Belum Hadir') return s.status === 'BELUM_CATAT' || s.status === 'LIBUR_OFF';
+      return true;
+    });
+  }, [staffTidakHadir, subFilterTidakHadir]);
 
   // Unit Breakdown for Tab 3 (Kapasitas Tim)
   const unitBreakdown = useMemo(() => {
@@ -569,48 +595,45 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
               </div>
             </div>
 
-            {/* Info Staf yang Sedang Izin / Sakit / Cuti Hari Ini */}
-            {staffOnLeave.length > 0 && (
-              <div className="bg-amber-950/30 border border-amber-500/30 rounded-2xl p-4 sm:p-5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                  <h3 className="font-bold text-white text-xs sm:text-sm">
-                    Daftar Staf yang Sedang Izin / Sakit / Cuti pada {formatTanggalIndo(selectedDate, true)} ({staffOnLeave.length} Staf)
-                  </h3>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-                  {staffOnLeave.map((s) => (
-                    <div
-                      key={s.id}
-                      className="p-3 bg-slate-900/80 border border-slate-800 rounded-xl flex items-center justify-between gap-2"
-                    >
-                      <div className="min-w-0">
-                        <div className="font-bold text-xs text-white truncate">{s.nama}</div>
-                        <div className="text-[10px] text-slate-400 truncate">{s.jabatan}</div>
-                      </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                        {s.keterangan}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Tabel Daftar Kehadiran Staf Lengkap */}
+            {/* Tabel Staf Yang Tidak Hadir (Menggantikan Daftar Personil & Status Presensi) */}
             <div className="bg-slate-800/40 border border-slate-800 rounded-3xl overflow-hidden shadow-sm">
-              <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-bold text-sm sm:text-base text-white">
-                    Daftar Personil &amp; Status Presensi
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Menampilkan {dailyAttendanceList.length} dari {staffList.length} personil terdaftar
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-sm sm:text-base text-white">
+                      Staf Yang Tidak Hadir
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      {staffTidakHadir.length} Staf
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Menampilkan staf yang berhalangan hadir (Sakit, Izin, Cuti, Belum Tercatat) pada {formatTanggalIndo(selectedDate, true)}
                   </p>
                 </div>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  Tanggal Aktif: {selectedDate}
-                </span>
+
+                {/* Subfilter Kategori Ketidakhadiran */}
+                <div className="flex flex-wrap items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-700/80 text-xs">
+                  {[
+                    { id: 'Semua', label: `Semua (${staffTidakHadir.length})` },
+                    { id: 'Sakit', label: `Sakit (${stats.sakit})` },
+                    { id: 'Izin', label: `Izin (${stats.ijin})` },
+                    { id: 'Cuti', label: `Cuti (${stats.cuti})` },
+                    { id: 'Belum Hadir', label: `Belum Tercatat (${stats.belumCatat})` },
+                  ].map((flt) => (
+                    <button
+                      key={flt.id}
+                      onClick={() => setSubFilterTidakHadir(flt.id as any)}
+                      className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer text-[11px] ${
+                        subFilterTidakHadir === flt.id
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {flt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -620,29 +643,53 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
                       <th className="py-3 px-4">Nama Staf</th>
                       <th className="py-3 px-4">Jabatan</th>
                       <th className="py-3 px-4">Bagian / Sekup</th>
-                      <th className="py-3 px-4 text-center">Status</th>
-                      <th className="py-3 px-4 text-center">Jam Masuk</th>
-                      <th className="py-3 px-4">Keterangan</th>
+                      <th className="py-3 px-4 text-center">Status Ketidakhadiran</th>
+                      <th className="py-3 px-4 text-center">Jam / Durasi Ijin</th>
+                      <th className="py-3 px-4">Keterangan / Alasan</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
-                    {dailyAttendanceList.length === 0 ? (
+                    {filteredTidakHadir.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-8 text-slate-500">
-                          Tidak ditemukan data staf yang sesuai dengan filter.
+                        <td colSpan={6} className="text-center py-10 px-4">
+                          {isSunday ? (
+                            <div className="flex flex-col items-center justify-center space-y-1.5 text-slate-400">
+                              <Calendar className="w-7 h-7 text-indigo-400 mb-1" />
+                              <span className="font-bold text-white text-sm">
+                                Hari Minggu — Hari Libur Operasional Pabrik PP1
+                              </span>
+                              <span className="text-xs text-slate-400">
+                                Seluruh staf diliburkan sesuai jadwal baku jam kerja resmi PT Batu Karang.
+                              </span>
+                            </div>
+                          ) : staffTidakHadir.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center space-y-1.5 text-emerald-400">
+                              <CheckCircle2 className="w-8 h-8 text-emerald-400 mb-1" />
+                              <span className="font-bold text-white text-sm">
+                                Seluruh Staf Hadir Lengkap
+                              </span>
+                              <span className="text-xs text-slate-400">
+                                Tidak ada staf yang tercatat izin, sakit, cuti, atau berhalangan hadir pada tanggal ini.
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="text-slate-400 text-xs">
+                              Tidak ada data staf untuk filter ketidakhadiran "{subFilterTidakHadir}".
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ) : (
-                      dailyAttendanceList.map((s) => (
+                      filteredTidakHadir.map((s) => (
                         <tr key={s.id} className="hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4">
                             <div className="font-bold text-white">{s.nama}</div>
                             <div className="text-[10px] text-slate-400 font-mono">{s.nip}</div>
                           </td>
-                          <td className="py-3 px-4 text-slate-300 font-medium">
+                          <td className="py-3.5 px-4 text-slate-300 font-medium">
                             {s.jabatan}
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-3.5 px-4">
                             <span
                               className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                 s.sekup === 'Operasional'
@@ -653,34 +700,36 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
                               {s.sekup}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-center">
-                            {s.status === 'HADIR' ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-700/60">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                Hadir
-                              </span>
-                            ) : s.status === 'SAKIT' ? (
+                          <td className="py-3.5 px-4 text-center">
+                            {s.status === 'SAKIT' ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-700/60">
+                                <AlertTriangle className="w-3 h-3 text-amber-400" />
                                 Sakit
                               </span>
                             ) : s.status === 'IJIN' ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-950 text-blue-300 border border-blue-700/60">
+                                <Clock className="w-3 h-3 text-blue-400" />
                                 Izin
                               </span>
                             ) : s.status === 'CUTI' ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-700/60">
+                                <Calendar className="w-3 h-3 text-purple-400" />
                                 Cuti
                               </span>
+                            ) : s.status === 'LIBUR_OFF' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                                Libur / Off
+                              </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-800/60">
                                 Belum Tercatat
                               </span>
                             )}
                           </td>
-                          <td className="py-3 px-4 text-center font-mono font-semibold text-slate-300">
-                            {s.jamMasuk}
+                          <td className="py-3.5 px-4 text-center font-mono font-semibold text-slate-300">
+                            {s.jamRentang || s.jamMasuk}
                           </td>
-                          <td className="py-3 px-4 text-slate-400 text-[11px]">
+                          <td className="py-3.5 px-4 text-slate-300 text-xs">
                             {s.keterangan}
                           </td>
                         </tr>
@@ -755,10 +804,10 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
           <div className="space-y-6">
             <div className="bg-slate-800/60 border border-slate-800 rounded-2xl p-4 sm:p-5">
               <h3 className="font-bold text-white text-sm sm:text-base">
-                Distribusi &amp; Alokasi Kapasitas Personil (32 Staf)
+                Distribusi &amp; Alokasi Kapasitas Staf (32 Staf)
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Pemetaan personil resmi Divisi Produksi I berdasarkan departemen operasional dan administrasi.
+                Pemetaan staf resmi Divisi Produksi I berdasarkan departemen operasional dan administrasi.
               </p>
             </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Lock,
   User,
@@ -10,6 +10,11 @@ import {
   ShieldCheck,
   CheckCircle2,
   Globe,
+  Search,
+  ChevronDown,
+  X,
+  AlertOctagon,
+  UserCheck,
 } from 'lucide-react';
 import { AuthUser, StaffData, UserRole } from '../types';
 
@@ -21,6 +26,7 @@ interface LoginGateModalProps {
   onCloseSecretDoorTrigger: () => void;
   onUnlockDeveloperMode: () => void;
   onOpenPublicPortal?: () => void;
+  initialGate?: 'management' | 'staff';
 }
 
 export const LoginGateModal: React.FC<LoginGateModalProps> = ({
@@ -31,8 +37,16 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
   onCloseSecretDoorTrigger,
   onUnlockDeveloperMode,
   onOpenPublicPortal,
+  initialGate = 'management',
 }) => {
-  const [activeGate, setActiveGate] = useState<'management' | 'staff'>('management');
+  const [activeGate, setActiveGate] = useState<'management' | 'staff'>(initialGate);
+
+  // Sync activeGate when initialGate prop changes or modal opens
+  useEffect(() => {
+    if (initialGate) {
+      setActiveGate(initialGate);
+    }
+  }, [initialGate, isOpen]);
 
   // Gate 1: Management
   const [mgmtEmail, setMgmtEmail] = useState('');
@@ -41,9 +55,37 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
   const [mgmtError, setMgmtError] = useState<string | null>(null);
 
   // Gate 2: Staff Portal
-  const [staffNip, setStaffNip] = useState('');
-  const [staffNama, setStaffNama] = useState('');
+  const [staffSearchInput, setStaffSearchInput] = useState('');
+  const [isStaffDropdownOpen, setIsStaffDropdownOpen] = useState(false);
+  const [highlightedStaffIdx, setHighlightedStaffIdx] = useState(0);
   const [staffError, setStaffError] = useState<string | null>(null);
+  const staffInputRef = useRef<HTMLInputElement>(null);
+  const staffDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Filter staff suggestions from database
+  const staffSuggestions = useMemo(() => {
+    const q = staffSearchInput.trim().toLowerCase();
+    if (!q) return staffList;
+    return staffList.filter(
+      (s) =>
+        s.nama.toLowerCase().includes(q) ||
+        s.nip.toLowerCase().includes(q) ||
+        (s.jabatan && s.jabatan.toLowerCase().includes(q))
+    );
+  }, [staffList, staffSearchInput]);
+
+  // Click outside listener for staff dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (staffDropdownRef.current && !staffDropdownRef.current.contains(e.target as Node)) {
+        setIsStaffDropdownOpen(false);
+      }
+    };
+    if (isStaffDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isStaffDropdownOpen]);
 
   // Secret Door State
   const [showDevDoorModal, setShowDevDoorModal] = useState(false);
@@ -117,35 +159,50 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
     }
   };
 
-  // Handle Gate 2
+  // Handle Gate 2: Staff Portal Login
+  const handleSelectStaffSuggestion = (s: StaffData) => {
+    setStaffSearchInput(s.nama);
+    setIsStaffDropdownOpen(false);
+    setStaffError(null);
+  };
+
   const handleStaffLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setStaffError(null);
 
-    const nipInput = staffNip.trim().toUpperCase();
-    const namaInput = staffNama.trim().toLowerCase();
+    const query = staffSearchInput.trim().toLowerCase();
+    if (!query) {
+      setStaffError('Silakan masukkan nama lengkap atau NIP Anda yang tercatat di database.');
+      return;
+    }
 
+    // Exact or matching search in official staff database
     const matched = staffList.find(
       (s) =>
-        s.nip.toUpperCase() === nipInput &&
-        s.nama.toLowerCase().includes(namaInput)
+        s.nama.trim().toLowerCase() === query ||
+        s.nip.trim().toLowerCase() === query ||
+        (query.length >= 3 && s.nama.trim().toLowerCase().includes(query))
     );
 
-    if (matched) {
-      const user: AuthUser = {
-        id: `usr-stf-${matched.id}`,
-        nip: matched.nip,
-        nama: matched.nama,
-        email: matched.email,
-        role: 'Staf',
-        portalType: 'staff',
-        allowedTabs: ['slip', 'presensi', 'cuti', 'profil'],
-        department: matched.sekup,
-      };
-      onLoginSuccess(user);
-    } else {
-      setStaffError('Data staf tidak ditemukan. Pastikan NIP dan Nama lengkap sesuai data.');
+    if (!matched) {
+      // STRICT REQUIREMENT: TOLAK AKSES JIKA LOGIN DENGAN NAMA YANG TIDAK TERCANTUM PADA DATABASE
+      setStaffError(
+        `AKSES DITOLAK: Nama atau NIP "${staffSearchInput}" TIDAK TERCANTUM pada database staf resmi PT Batu Karang. Akses hanya diizinkan untuk staf yang terdaftar dalam database.`
+      );
+      return;
     }
+
+    const user: AuthUser = {
+      id: `usr-stf-${matched.id || matched.nip}`,
+      nip: matched.nip,
+      nama: matched.nama,
+      email: matched.email || `${matched.nip.toLowerCase()}@batukarang.co.id`,
+      role: 'Staf',
+      portalType: 'staff',
+      allowedTabs: ['presensi', 'slip', 'cuti', 'profil'],
+      department: matched.sekup,
+    };
+    onLoginSuccess(user);
   };
 
   // Handle Secret PIN verification
@@ -334,54 +391,122 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
                 </form>
               ) : (
                 <form onSubmit={handleStaffLogin} className="space-y-4">
-                  <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300 text-xs">
-                    Portal Mandiri terisolasi: Anda hanya dapat mengakses slip gaji dan data profil pribadi Anda sendiri.
+                  <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300 text-xs leading-relaxed">
+                    <strong>Portal Mandiri Staf Terisolasi:</strong> Seluruh staf terdaftar pada database dapat login mandiri untuk mengisi form ijin dan melihat slip gaji pribadi. Data staf lain tidak diperkenankan untuk ditampilkan.
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      NIP Karyawan (Format: BK-PP1-xxx)
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={staffNip}
-                      onChange={(e) => setStaffNip(e.target.value)}
-                      placeholder="BK-PP1-006"
-                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white uppercase font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-                  </div>
+                  <div className="space-y-1.5" ref={staffDropdownRef}>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Nama Lengkap atau NIP Staf <span className="text-red-500">*</span>
+                      </label>
+                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full">
+                        {staffList.length} Staf Terdaftar
+                      </span>
+                    </div>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Nama Lengkap Karyawan
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={staffNama}
-                      onChange={(e) => setStaffNama(e.target.value)}
-                      placeholder="Fajar Nugroho"
-                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        ref={staffInputRef}
+                        type="text"
+                        required
+                        value={staffSearchInput}
+                        onChange={(e) => {
+                          setStaffSearchInput(e.target.value);
+                          setStaffError(null);
+                          if (!isStaffDropdownOpen) setIsStaffDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsStaffDropdownOpen(true)}
+                        placeholder="Ketik nama staf atau NIP..."
+                        className="w-full pl-9 pr-16 py-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                      />
+
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        {staffSearchInput && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStaffSearchInput('');
+                              setStaffError(null);
+                              setIsStaffDropdownOpen(true);
+                              staffInputRef.current?.focus();
+                            }}
+                            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-md cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setIsStaffDropdownOpen(!isStaffDropdownOpen)}
+                          className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-md cursor-pointer"
+                        >
+                          <ChevronDown
+                            className={`w-3.5 h-3.5 transition-transform ${
+                              isStaffDropdownOpen ? 'rotate-180 text-emerald-600' : ''
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Dropdown saran staf terdaftar dari database */}
+                      {isStaffDropdownOpen && (
+                        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 animate-in fade-in slide-in-from-top-1 duration-150">
+                          <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-950/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 flex items-center justify-between">
+                            <span>Daftar Staf Resmi Database PP1</span>
+                            <span>{staffSuggestions.length} Staf</span>
+                          </div>
+                          {staffSuggestions.length === 0 ? (
+                            <div className="p-3 text-center text-xs text-rose-500">
+                              Tidak ada staf dengan nama "{staffSearchInput}" di database.
+                            </div>
+                          ) : (
+                            staffSuggestions.map((st) => (
+                              <button
+                                key={st.nip}
+                                type="button"
+                                onClick={() => handleSelectStaffSuggestion(st)}
+                                className="w-full px-3 py-2 text-left flex items-center justify-between gap-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer text-xs group"
+                              >
+                                <div className="min-w-0">
+                                  <div className="font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 truncate">
+                                    {st.nama}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 truncate">
+                                    {st.jabatan} • {st.sekup}
+                                  </div>
+                                </div>
+                                <span className="font-mono text-[10px] text-slate-400 shrink-0">
+                                  {st.nip}
+                                </span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {staffError && (
-                    <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 rounded-xl text-xs flex items-start gap-2">
-                      <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>{staffError}</span>
+                    <div className="p-3 bg-red-50 dark:bg-red-950/50 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 rounded-xl text-xs flex items-start gap-2.5 animate-in shake duration-200">
+                      <AlertOctagon className="w-5 h-5 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+                      <div className="leading-relaxed">
+                        <strong className="block font-bold">AKSES DITOLAK</strong>
+                        <span>{staffError}</span>
+                      </div>
                     </div>
                   )}
 
                   <button
                     type="submit"
-                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition-all flex items-center justify-center gap-1.5"
+                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    Buka Portal Karyawan <ArrowRight className="w-4 h-4" />
+                    Buka Portal Mandiri Staf <ArrowRight className="w-4 h-4" />
                   </button>
 
                   <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 text-center">
-                    Contoh: NIP <code>BK-PP1-006</code> / Nama: <code>Fajar Nugroho</code>
+                    Akses aman: Setiap staf hanya dapat mengakses &amp; mengajukan data dirinya sendiri.
                   </div>
                 </form>
               )}
