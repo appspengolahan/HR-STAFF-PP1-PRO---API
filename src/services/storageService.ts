@@ -340,18 +340,38 @@ export const storageService = {
       ...baseList.filter((b) => !unsyncedManual.some((m) => m.id === b.id)),
     ];
 
-    // Normalisasi durasi menit (bulatkan desimal floating point) & faktor potongan presisi
-    return combined.map((p) => {
+    // Normalisasi durasi menit & pastikan faktor potongan selalu selaras dengan aturan resmi (<= 2 jam bebas potongan)
+    let manualUpdated = false;
+    const sanitizedManual = unsyncedManual.map((m) => {
+      const durasiMenit = Math.round(Number(m.durasiMenit) || 0);
+      const cleanM: PresensiRecord = { ...m, durasiMenit };
+      const eff = getEffectiveFaktorPotongan(cleanM);
+      if (cleanM.faktorPotongan !== eff) {
+        manualUpdated = true;
+        return { ...cleanM, faktorPotongan: eff };
+      }
+      return cleanM;
+    });
+    if (manualUpdated) {
+      writeStorage(KEYS.PRESENSI_MANUAL, sanitizedManual);
+    }
+
+    const finalCombined = [
+      ...sanitizedManual,
+      ...baseList.filter((b) => !sanitizedManual.some((m) => m.id === b.id)),
+    ];
+
+    return finalCombined.map((p) => {
       const durasiMenit = Math.round(Number(p.durasiMenit) || 0);
       const cleanP: PresensiRecord = {
         ...p,
         durasiMenit,
       };
       const eff = getEffectiveFaktorPotongan(cleanP);
-      if (eff > 0 && (cleanP.faktorPotongan === 0 || cleanP.faktorPotongan === undefined)) {
-        return { ...cleanP, faktorPotongan: eff };
-      }
-      return cleanP;
+      return {
+        ...cleanP,
+        faktorPotongan: eff,
+      };
     });
   },
   savePresensiList(list: PresensiRecord[]): void {

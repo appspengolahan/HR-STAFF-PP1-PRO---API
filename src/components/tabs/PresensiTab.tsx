@@ -412,9 +412,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
     );
 
     setEditDurasiMenit(calc.durasiMenit);
-    setEditFaktorPotongan(
-      rec.faktorPotongan !== undefined ? rec.faktorPotongan : calc.faktorPotongan
-    );
+    setEditFaktorPotongan(calc.faktorPotongan);
     setEditKeperluan(rec.keperluan || '');
     setEditLampiranSurat(rec.lampiranSurat || 'Tidak');
     setEditCatatan(rec.catatan || '');

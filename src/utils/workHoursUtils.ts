@@ -229,12 +229,19 @@ export function calculateEffectivePermitMinutes(
 
   const netMinutes = Math.max(0, durasiBruto - breakDed);
 
-  // Perhitungan faktor potongan proporsional
+  // Perhitungan faktor potongan berdasarkan ketentuan resmi PT Batu Karang:
+  // - Faktor 0 (Bebas Potongan / Dibayar 100%): Ijin parsial (terlambat, pulang awal, keluar sementara) <= 2 jam (<= 120 menit)
+  // - Faktor 0.5 (Dipotong Setengah Hari): Ijin parsial > 2 jam s.d. 4 jam (121 - 240 menit)
+  // - Faktor 1.0 (Hangus Penuh / Dipotong 1 Hari): Ijin parsial >= 4 jam (>= 240 menit) atau ijin harian tanpa surat dokter
   let faktor = 0;
-  if (!isNormatif && sched.effectiveWorkMinutes > 0) {
-    faktor = Math.round((netMinutes / sched.effectiveWorkMinutes) * 100) / 100;
-    // Jaga batas maksimal 1.0
-    if (faktor > 1) faktor = 1.0;
+  if (!isNormatif) {
+    if (netMinutes <= 120) {
+      faktor = 0;
+    } else if (netMinutes <= 240) {
+      faktor = 0.5;
+    } else {
+      faktor = 1.0;
+    }
   }
 
   return {
@@ -308,7 +315,7 @@ export function normalizePresensiRecord(record: PresensiRecord): PresensiRecord 
       ...record,
       hari: sched.dayName,
       durasiMenit: calc.durasiMenit,
-      faktorPotongan: record.faktorPotongan !== undefined ? record.faktorPotongan : calc.faktorPotongan,
+      faktorPotongan: calc.faktorPotongan,
     };
   }
 

@@ -230,9 +230,10 @@ export function getEffectiveFaktorPotongan(p: {
   const lampiran = (p.lampiranSurat || '').trim().toLowerCase();
   const catatan = (p.catatan || '').trim().toLowerCase();
 
-  // Sakit dengan Surat Dokter Resmi (ada surat dokter / lampiran Ya) tidak dipotong
+  // Hadir, Sakit dengan Surat Dokter Resmi, Cuti, & Ijin Normatif tidak dipotong (Faktor 0)
   if (
     jenis === 'Sakit (S Dokter)' ||
+    jenis === 'Hadir' ||
     lampiran === 'ya' ||
     catatan.includes('surat dokter') ||
     jenis === 'Cuti' ||
@@ -242,12 +243,24 @@ export function getEffectiveFaktorPotongan(p: {
     return 0;
   }
 
-  // Jika faktor potongan sudah terisi angka valid > 0
-  if (typeof p.faktorPotongan === 'number' && !isNaN(p.faktorPotongan) && p.faktorPotongan > 0) {
-    return p.faktorPotongan;
+  // Ketentuan Resmi Potongan Ijin PT Batu Karang:
+  // - Ijin parsial (terlambat, pulang awal, keluar sementara) <= 2 jam (<= 120 menit) -> BEBAS POTONGAN (Faktor 0)
+  // - Ijin parsial antara 2 jam s.d. 4 jam (121 - 240 menit) -> POTONG SETENGAH HARI (Faktor 0.5)
+  // - Ijin parsial >= 4 jam (>= 240 menit) -> HANGUS 1 HARI PENUH (Faktor 1.0)
+  if (
+    jenis === 'Ijin Terlambat' ||
+    jenis === 'Ijin Keluar Sementara' ||
+    jenis === 'Ijin Pulang Awal' ||
+    jenis.toLowerCase().includes('terlambat') ||
+    jenis.toLowerCase().includes('pulang awal') ||
+    jenis.toLowerCase().includes('keluar sementara')
+  ) {
+    if (durasi <= 120) return 0;
+    if (durasi <= 240) return 0.5;
+    return 1.0;
   }
 
-  // Evaluasi jenis izin tidak dibayar penuh (1 hari kerja)
+  // Evaluasi jenis izin tidak dibayar penuh (1 hari kerja = Faktor 1.0)
   if (
     jenis === 'Ijin (S Tangan)' ||
     jenis === 'Sakit (S Tangan)' ||
@@ -257,18 +270,16 @@ export function getEffectiveFaktorPotongan(p: {
     return 1.0;
   }
 
-  // Izin parsial harian (terlambat, pulang cepat, keluar sementara)
+  // Jika faktor potongan sudah terisi standar (0, 0.5, 1.0)
   if (
-    jenis === 'Ijin Terlambat' ||
-    jenis === 'Ijin Keluar Sementara' ||
-    jenis === 'Ijin Pulang Awal'
+    typeof p.faktorPotongan === 'number' &&
+    !isNaN(p.faktorPotongan) &&
+    (p.faktorPotongan === 0 || p.faktorPotongan === 0.5 || p.faktorPotongan === 1.0)
   ) {
-    if (durasi <= 120) return 0;
-    if (durasi < 240) return 0.5;
-    return 1.0;
+    return p.faktorPotongan;
   }
 
-  return Number(p.faktorPotongan) || 0;
+  return 0;
 }
 
 /**

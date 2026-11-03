@@ -55,7 +55,7 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
   // 3. Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSekup, setSelectedSekup] = useState<'Semua' | 'Operasional' | 'Administrasi'>('Semua');
-  const [subFilterTidakHadir, setSubFilterTidakHadir] = useState<'Semua' | 'Sakit' | 'Izin' | 'Cuti' | 'Belum Hadir'>('Semua');
+  const [subFilterTidakHadir, setSubFilterTidakHadir] = useState<'Semua' | 'Sakit' | 'Izin' | 'Cuti'>('Semua');
   const [selectedBulanRekap, setSelectedBulanRekap] = useState<string>(() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -124,13 +124,19 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
             r.nama.trim().toLowerCase() === staff.nama.trim().toLowerCase()
         );
 
-        let status: 'HADIR' | 'SAKIT' | 'IJIN' | 'CUTI' | 'LIBUR_OFF' | 'BELUM_CATAT' = 'BELUM_CATAT';
-        let jamMasuk = '-';
-        let jamPulang = '-';
-        let keterangan = '-';
-
+        // Sesuai sistem HR Divisi Produksi I (exception-based):
+        // Jika tidak ada catatan ijin/sakit/cuti pada tanggal tersebut, otomatis dianggap HADIR!
+        let status: 'HADIR' | 'SAKIT' | 'IJIN' | 'CUTI' | 'LIBUR_OFF' = 'HADIR';
+        let jamMasuk = '08:00';
+        let jamPulang = '16:00';
+        let keterangan = 'Hadir';
         let jamRentang = '-';
-        if (rec) {
+
+        if (isSunday) {
+          status = 'LIBUR_OFF';
+          keterangan = 'Libur Operasional Mingguan';
+          jamRentang = 'Off';
+        } else if (rec) {
           jamMasuk = rec.jamAwal || '-';
           jamPulang = rec.jamAkhir || '-';
           if (rec.jamAwal && rec.jamAkhir && rec.jamAwal !== '-' && rec.jamAkhir !== '-') {
@@ -146,19 +152,32 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
           } else if (ji.includes('cuti')) {
             status = 'CUTI';
             keterangan = rec.jenisIjin || 'Cuti Tahunan';
-          } else if (ji.includes('ijin') || ji.includes('izin')) {
-            status = 'IJIN';
-            keterangan = rec.jenisIjin || 'Izin';
           } else if (ji.includes('off') || ji.includes('libur')) {
             status = 'LIBUR_OFF';
             keterangan = 'Libur / Off';
+          } else if (
+            ji.includes('ijin') ||
+            ji.includes('izin') ||
+            ji.includes('terlambat') ||
+            ji.includes('pulang awal') ||
+            ji.includes('keluar') ||
+            ji.includes('alpha') ||
+            ji.includes('mangkir')
+          ) {
+            status = 'IJIN';
+            keterangan = rec.keperluan ? `${rec.jenisIjin} — ${rec.keperluan}` : (rec.jenisIjin || 'Izin');
           } else if (rec.jamAwal && rec.jamAwal !== '-') {
             status = 'HADIR';
             keterangan = rec.catatan || rec.keperluan || 'Hadir Normal';
           } else {
-            status = 'BELUM_CATAT';
-            keterangan = rec.catatan || rec.keperluan || 'Belum Terdata';
+            status = 'HADIR';
+            keterangan = 'Hadir';
           }
+        } else {
+          // Tidak ada catatan ketidakhadiran -> Otomatis dianggap Hadir!
+          status = 'HADIR';
+          keterangan = 'Hadir';
+          jamRentang = '-';
         }
 
         return {
@@ -183,7 +202,7 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
           s.jabatan.toLowerCase().includes(q)
         );
       });
-  }, [filteredStaff, recordsOnDate, searchQuery]);
+  }, [filteredStaff, recordsOnDate, searchQuery, isSunday]);
 
   // Quick Stats Counter
   const stats = useMemo(() => {
@@ -191,26 +210,30 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
     let sakit = 0;
     let ijin = 0;
     let cuti = 0;
-    let belumCatat = 0;
 
     dailyAttendanceList.forEach((s) => {
       if (s.status === 'HADIR') hadir++;
       else if (s.status === 'SAKIT') sakit++;
       else if (s.status === 'IJIN') ijin++;
       else if (s.status === 'CUTI') cuti++;
-      else belumCatat++;
     });
 
     const totalFiltered = dailyAttendanceList.length;
-    const rate = totalFiltered > 0 ? Math.round((hadir / totalFiltered) * 100) : 0;
+    // Pada hari kerja, tingkat kehadiran = (staf hadir / total staf) * 100%
+    const rate = isSunday
+      ? 100
+      : totalFiltered > 0
+      ? Math.round((hadir / totalFiltered) * 100)
+      : 100;
 
-    return { hadir, sakit, ijin, cuti, belumCatat, totalFiltered, rate };
-  }, [dailyAttendanceList]);
+    return { hadir, sakit, ijin, cuti, totalFiltered, rate };
+  }, [dailyAttendanceList, isSunday]);
 
-  // Staf yang tidak hadir pada hari terpilih
+  // Staf yang tidak hadir pada hari terpilih (HANYA staf yang memiliki catatan Sakit, Izin, Cuti)
   const staffTidakHadir = useMemo(() => {
-    return dailyAttendanceList.filter((s) => s.status !== 'HADIR');
-  }, [dailyAttendanceList]);
+    if (isSunday) return [];
+    return dailyAttendanceList.filter((s) => s.status !== 'HADIR' && s.status !== 'LIBUR_OFF');
+  }, [dailyAttendanceList, isSunday]);
 
   // Subfilter staf tidak hadir
   const filteredTidakHadir = useMemo(() => {
@@ -219,7 +242,6 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
       if (subFilterTidakHadir === 'Sakit') return s.status === 'SAKIT';
       if (subFilterTidakHadir === 'Izin') return s.status === 'IJIN';
       if (subFilterTidakHadir === 'Cuti') return s.status === 'CUTI';
-      if (subFilterTidakHadir === 'Belum Hadir') return s.status === 'BELUM_CATAT' || s.status === 'LIBUR_OFF';
       return true;
     });
   }, [staffTidakHadir, subFilterTidakHadir]);
@@ -608,7 +630,7 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Menampilkan staf yang berhalangan hadir (Sakit, Izin, Cuti, Belum Tercatat) pada {formatTanggalIndo(selectedDate, true)}
+                    Menampilkan staf yang berhalangan hadir (Sakit, Izin, Cuti) pada {formatTanggalIndo(selectedDate, true)}
                   </p>
                 </div>
 
@@ -619,7 +641,6 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
                     { id: 'Sakit', label: `Sakit (${stats.sakit})` },
                     { id: 'Izin', label: `Izin (${stats.ijin})` },
                     { id: 'Cuti', label: `Cuti (${stats.cuti})` },
-                    { id: 'Belum Hadir', label: `Belum Tercatat (${stats.belumCatat})` },
                   ].map((flt) => (
                     <button
                       key={flt.id}
@@ -722,7 +743,7 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-800/60">
-                                Belum Tercatat
+                                Tidak Hadir
                               </span>
                             )}
                           </td>
