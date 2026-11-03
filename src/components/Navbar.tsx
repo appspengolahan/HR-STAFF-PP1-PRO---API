@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   UserCheck,
   Globe,
+  KeyRound,
 } from 'lucide-react';
 import { AuthUser, AppBrandingSettings, UserRole } from '../types';
 import { usePWAInstall } from '../hooks/usePWAInstall';
@@ -51,6 +52,7 @@ interface NavbarProps {
   branding?: AppBrandingSettings;
   onOpenBrandCustomizer?: () => void;
   onOpenPublicShare?: () => void;
+  onOpenChangePin?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -77,6 +79,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   branding,
   onOpenBrandCustomizer,
   onOpenPublicShare,
+  onOpenChangePin,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
@@ -553,6 +556,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                     <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                       Linktree
+                    </span>
+                  </button>
+                )}
+
+                {onOpenChangePin && currentUser && (
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onOpenChangePin();
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors text-left cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                        <KeyRound className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-xs">Ganti PIN Portal Mandiri</div>
+                        <div className="text-[10px] text-slate-400">Atur PIN 6-digit Keamanan Akun</div>
+                      </div>
+                    </div>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+                      PIN
                     </span>
                   </button>
                 )}

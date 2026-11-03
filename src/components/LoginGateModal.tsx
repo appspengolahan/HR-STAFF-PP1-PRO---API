@@ -15,8 +15,11 @@ import {
   X,
   AlertOctagon,
   UserCheck,
+  Mail,
+  Key,
 } from 'lucide-react';
 import { AuthUser, StaffData, UserRole } from '../types';
+import { storageService, DEFAULT_STAFF_PIN } from '../services/storageService';
 
 interface LoginGateModalProps {
   isOpen: boolean;
@@ -54,13 +57,30 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [mgmtError, setMgmtError] = useState<string | null>(null);
 
-  // Gate 2: Staff Portal
+  // Gate 2: Staff Portal (3-Factor Authentication: Nama/NIP, Email Terdaftar, PIN)
   const [staffSearchInput, setStaffSearchInput] = useState('');
+  const [staffEmailInput, setStaffEmailInput] = useState('');
+  const [staffPinInput, setStaffPinInput] = useState('');
+  const [showStaffPin, setShowStaffPin] = useState(false);
+  const [selectedStaffObj, setSelectedStaffObj] = useState<StaffData | null>(null);
   const [isStaffDropdownOpen, setIsStaffDropdownOpen] = useState(false);
   const [highlightedStaffIdx, setHighlightedStaffIdx] = useState(0);
   const [staffError, setStaffError] = useState<string | null>(null);
   const staffInputRef = useRef<HTMLInputElement>(null);
   const staffDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Helper mask email for security hint (e.g. "c***y@gmail.com")
+  const maskEmailHint = (email?: string): string => {
+    if (!email || !email.includes('@')) return 'email-terdaftar@...';
+    const [name, domain] = email.split('@');
+    if (name.length <= 2) {
+      return `${name[0]}*@${domain}`;
+    }
+    const start = name.slice(0, 2);
+    const end = name.slice(-1);
+    const stars = '*'.repeat(Math.max(2, name.length - 3));
+    return `${start}${stars}${end}@${domain}`;
+  };
 
   // Filter staff suggestions from database
   const staffSuggestions = useMemo(() => {
@@ -159,9 +179,10 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
     }
   };
 
-  // Handle Gate 2: Staff Portal Login
+  // Handle Gate 2: Staff Portal Login (3-Factor Authentication)
   const handleSelectStaffSuggestion = (s: StaffData) => {
     setStaffSearchInput(s.nama);
+    setSelectedStaffObj(s);
     setIsStaffDropdownOpen(false);
     setStaffError(null);
   };
@@ -172,11 +193,11 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
 
     const query = staffSearchInput.trim().toLowerCase();
     if (!query) {
-      setStaffError('Silakan masukkan nama lengkap atau NIP Anda yang tercatat di database.');
+      setStaffError('Silakan pilih nama lengkap atau masukkan NIP Anda.');
       return;
     }
 
-    // Exact or matching search in official staff database
+    // 1. Verifikasi Faktor 1: Staf Terdaftar di Database
     const matched = staffList.find(
       (s) =>
         s.nama.trim().toLowerCase() === query ||
@@ -185,13 +206,44 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
     );
 
     if (!matched) {
-      // STRICT REQUIREMENT: TOLAK AKSES JIKA LOGIN DENGAN NAMA YANG TIDAK TERCANTUM PADA DATABASE
       setStaffError(
-        `AKSES DITOLAK: Nama atau NIP "${staffSearchInput}" TIDAK TERCANTUM pada database staf resmi PT Batu Karang. Akses hanya diizinkan untuk staf yang terdaftar dalam database.`
+        `AKSES DITOLAK: Nama atau NIP "${staffSearchInput}" TIDAK TERCANTUM pada database staf resmi PT Batu Karang. Akses hanya diizinkan untuk staf terdaftar.`
       );
       return;
     }
 
+    // 2. Verifikasi Faktor 2: Email Resmi Terdaftar
+    const inputEmail = staffEmailInput.trim().toLowerCase();
+    const registeredEmail = (matched.email || `${matched.nip.toLowerCase()}@batukarang.co.id`).trim().toLowerCase();
+
+    if (!inputEmail) {
+      setStaffError('Silakan masukkan email resmi yang terdaftar di database HRD PT Batu Karang.');
+      return;
+    }
+
+    if (inputEmail !== registeredEmail) {
+      setStaffError(
+        `AKSES DITOLAK: Email yang dimasukkan tidak sesuai dengan email resmi staf ${matched.nama} di database HRD. Petunjuk: ${maskEmailHint(matched.email)}`
+      );
+      return;
+    }
+
+    // 3. Verifikasi Faktor 3: PIN Keamanan (Default: 123456 atau PIN kustom)
+    const inputPin = staffPinInput.trim();
+    if (!inputPin) {
+      setStaffError('Silakan masukkan PIN Keamanan Anda (PIN standar awal: 123456).');
+      return;
+    }
+
+    const correctPin = storageService.getStaffPin(matched.nip);
+    if (inputPin !== correctPin) {
+      setStaffError(
+        'AKSES DITOLAK: PIN Keamanan salah! Gunakan PIN standar (123456) jika belum pernah diubah, atau masukkan PIN baru yang telah Anda atur.'
+      );
+      return;
+    }
+
+    // Seluruh 3 faktor terverifikasi sukses
     const user: AuthUser = {
       id: `usr-stf-${matched.id || matched.nip}`,
       nip: matched.nip,
@@ -390,15 +442,21 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
                   </div>
                 </form>
               ) : (
-                <form onSubmit={handleStaffLogin} className="space-y-4">
-                  <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300 text-xs leading-relaxed">
-                    <strong>Portal Mandiri Staf Terisolasi:</strong> Seluruh staf terdaftar pada database dapat login mandiri untuk mengisi form ijin dan melihat slip gaji pribadi. Data staf lain tidak diperkenankan untuk ditampilkan.
+                <form onSubmit={handleStaffLogin} className="space-y-3.5">
+                  <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 text-emerald-850 dark:text-emerald-300 text-xs leading-relaxed">
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400 mb-1">
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Autentikasi 3-Faktor Keamanan Staf:</span>
+                    </div>
+                    Untuk mencegah penyalahgunaan akun, login staf wajib memverifikasi <strong>Nama Resmi</strong>, <strong>Email HR Terdaftar</strong>, dan <strong>PIN Keamanan</strong>.
                   </div>
 
-                  <div className="space-y-1.5" ref={staffDropdownRef}>
+                  {/* FAKTOR 1: Nama Lengkap / NIP */}
+                  <div className="space-y-1" ref={staffDropdownRef}>
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        Nama Lengkap atau NIP Staf <span className="text-red-500">*</span>
+                      <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <span className="w-4 h-4 rounded-full bg-emerald-600 text-white inline-flex items-center justify-center text-[9px] font-black">1</span>
+                        Nama Lengkap atau NIP <span className="text-red-500">*</span>
                       </label>
                       <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full">
                         {staffList.length} Staf Terdaftar
@@ -415,11 +473,18 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
                         onChange={(e) => {
                           setStaffSearchInput(e.target.value);
                           setStaffError(null);
+                          // Auto match object if exact match
+                          const exact = staffList.find(
+                            (s) =>
+                              s.nama.toLowerCase() === e.target.value.trim().toLowerCase() ||
+                              s.nip.toLowerCase() === e.target.value.trim().toLowerCase()
+                          );
+                          setSelectedStaffObj(exact || null);
                           if (!isStaffDropdownOpen) setIsStaffDropdownOpen(true);
                         }}
                         onFocus={() => setIsStaffDropdownOpen(true)}
                         placeholder="Ketik nama staf atau NIP..."
-                        className="w-full pl-9 pr-16 py-2.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                        className="w-full pl-9 pr-16 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                       />
 
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -428,6 +493,7 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
                             type="button"
                             onClick={() => {
                               setStaffSearchInput('');
+                              setSelectedStaffObj(null);
                               setStaffError(null);
                               setIsStaffDropdownOpen(true);
                               staffInputRef.current?.focus();
@@ -452,9 +518,9 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
 
                       {/* Dropdown saran staf terdaftar dari database */}
                       {isStaffDropdownOpen && (
-                        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 animate-in fade-in slide-in-from-top-1 duration-150">
-                          <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-950/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 flex items-center justify-between">
-                            <span>Daftar Staf Resmi Database PP1</span>
+                        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 animate-in fade-in slide-in-from-top-1 duration-150">
+                          <div className="px-3 py-1 bg-slate-50 dark:bg-slate-950/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 flex items-center justify-between">
+                            <span>Database Staf Resmi PP1</span>
                             <span>{staffSuggestions.length} Staf</span>
                           </div>
                           {staffSuggestions.length === 0 ? (
@@ -488,11 +554,78 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
                     </div>
                   </div>
 
+                  {/* FAKTOR 2: Email Resmi Terdaftar */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <span className="w-4 h-4 rounded-full bg-emerald-600 text-white inline-flex items-center justify-center text-[9px] font-black">2</span>
+                        Email Resmi Terdaftar di HR <span className="text-red-500">*</span>
+                      </label>
+                      {selectedStaffObj && (
+                        <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                          Petunjuk: {maskEmailHint(selectedStaffObj.email)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="email"
+                        required
+                        value={staffEmailInput}
+                        onChange={(e) => {
+                          setStaffEmailInput(e.target.value);
+                          setStaffError(null);
+                        }}
+                        placeholder="Masukkan alamat email resmi Anda..."
+                        className="w-full pl-9 pr-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* FAKTOR 3: PIN Keamanan */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <span className="w-4 h-4 rounded-full bg-emerald-600 text-white inline-flex items-center justify-center text-[9px] font-black">3</span>
+                        PIN Keamanan Staf <span className="text-red-500">*</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400">
+                        Default: <code>123456</code>
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <Key className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type={showStaffPin ? 'text' : 'password'}
+                        required
+                        maxLength={12}
+                        value={staffPinInput}
+                        onChange={(e) => {
+                          setStaffPinInput(e.target.value);
+                          setStaffError(null);
+                        }}
+                        placeholder="•••••• (Masukkan PIN Anda)"
+                        className="w-full pl-9 pr-10 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowStaffPin(!showStaffPin)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      >
+                        {showStaffPin ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      PIN awal adalah <strong>123456</strong>. Anda dapat mengganti PIN secara mandiri kapan saja setelah masuk ke portal.
+                    </p>
+                  </div>
+
                   {staffError && (
                     <div className="p-3 bg-red-50 dark:bg-red-950/50 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 rounded-xl text-xs flex items-start gap-2.5 animate-in shake duration-200">
-                      <AlertOctagon className="w-5 h-5 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
-                      <div className="leading-relaxed">
-                        <strong className="block font-bold">AKSES DITOLAK</strong>
+                      <AlertOctagon className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+                      <div className="leading-relaxed text-[11px]">
+                        <strong className="block font-bold">AKSES VERIFIKASI DITOLAK</strong>
                         <span>{staffError}</span>
                       </div>
                     </div>
@@ -500,13 +633,13 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
 
                   <button
                     type="submit"
-                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2"
                   >
-                    Buka Portal Mandiri Staf <ArrowRight className="w-4 h-4" />
+                    Verifikasi 3-Faktor &amp; Masuk Portal <ArrowRight className="w-4 h-4" />
                   </button>
 
-                  <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 text-center">
-                    Akses aman: Setiap staf hanya dapat mengakses &amp; mengajukan data dirinya sendiri.
+                  <div className="p-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400 text-center">
+                    Aman &amp; Terisolasi: Data pribadi staf lain tidak dapat diakses tanpa kredensial valid.
                   </div>
                 </form>
               )}

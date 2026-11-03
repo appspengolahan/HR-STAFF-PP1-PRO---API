@@ -18,10 +18,13 @@ import {
   ChevronDown,
   Check,
   X,
+  KeyRound,
+  Lock,
 } from 'lucide-react';
 import { StaffData, PresensiRecord, LinkArsip, AuthUser } from '../../types';
 import { formatRupiah, NAMA_BULAN_INDO } from '../../services/payrollEngine';
 import { formatTanggalDmy } from '../../utils/dateFormatter';
+import { storageService } from '../../services/storageService';
 
 interface ProfilStaffTabProps {
   staffList: StaffData[];
@@ -31,6 +34,7 @@ interface ProfilStaffTabProps {
   onDeleteLink: (id: string) => void;
   selectedStaffNip?: string;
   currentUser: AuthUser | null;
+  onOpenChangePin?: () => void;
 }
 
 export const ProfilStaffTab: React.FC<ProfilStaffTabProps> = ({
@@ -41,6 +45,7 @@ export const ProfilStaffTab: React.FC<ProfilStaffTabProps> = ({
   onDeleteLink,
   selectedStaffNip,
   currentUser,
+  onOpenChangePin,
 }) => {
   const isStaffPortal = currentUser?.portalType === 'staff';
   const initialNip =
@@ -463,7 +468,7 @@ export const ProfilStaffTab: React.FC<ProfilStaffTabProps> = ({
         )}
 
         {/* Detailed Attribute Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-xs">
           {/* Data Pribadi & Kontak */}
           <div className="space-y-3">
             <h3 className="font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-1.5 flex items-center gap-1.5">
@@ -559,6 +564,53 @@ export const ProfilStaffTab: React.FC<ProfilStaffTabProps> = ({
                 <span className="text-slate-400 block text-[10px]">Faskes Terdaftar</span>
                 <span className="font-semibold">{currentStaff.faskes || '-'}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Keamanan Akun & PIN Portal Mandiri */}
+          <div className="space-y-3">
+            <h3 className="font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-1.5 flex items-center gap-1.5">
+              <KeyRound className="w-4 h-4 text-teal-500" />
+              Keamanan Akun &amp; PIN
+            </h3>
+            <div className="space-y-2">
+              <div>
+                <span className="text-slate-400 block text-[10px]">Proteksi Portal</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5" /> 3-Factor Auth
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Status PIN Login</span>
+                <span
+                  className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                    storageService.hasStaffCustomPin(currentStaff.nip)
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                      : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                  }`}
+                >
+                  {storageService.hasStaffCustomPin(currentStaff.nip) ? 'PIN Kustom Aktif' : 'PIN Default (123456)'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Email Verifikasi</span>
+                <span className="font-mono text-[10px] truncate block text-slate-600 dark:text-slate-300" title={currentStaff.email}>
+                  {currentStaff.email || `${currentStaff.nip.toLowerCase()}@batukarang.co.id`}
+                </span>
+              </div>
+
+              {onOpenChangePin && (
+                <div className="pt-2 no-print">
+                  <button
+                    type="button"
+                    onClick={onOpenChangePin}
+                    className="w-full py-2 px-2.5 rounded-xl bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/50 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 border border-teal-300 dark:border-teal-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    Ubah PIN Mandiri
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

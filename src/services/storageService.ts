@@ -57,7 +57,10 @@ const KEYS = {
   SIDEBAR_COLLAPSED: 'bk_hr_sidebar_collapsed_v3',
   COLUMN_SETTINGS: 'bk_hr_column_settings_v4',
   BRANDING: 'bk_hr_app_branding_v1',
+  STAFF_PINS: 'bk_hr_staff_pins_v1',
 };
+
+export const DEFAULT_STAFF_PIN = '123456';
 
 // Cleanup old obsolete v1 and v2 keys
 if (typeof window !== 'undefined' && window.localStorage) {
@@ -709,6 +712,24 @@ export const storageService = {
     return DEFAULT_BRANDING;
   },
 
+  // Staff PIN Authentication (Portal Mandiri Staf 3-Factor Login)
+  getStaffPins(): Record<string, string> {
+    return readStorage<Record<string, string>>(KEYS.STAFF_PINS, {});
+  },
+  getStaffPin(nip: string): string {
+    const pins = this.getStaffPins();
+    return pins[nip] || DEFAULT_STAFF_PIN;
+  },
+  setStaffPin(nip: string, newPin: string): void {
+    const pins = this.getStaffPins();
+    pins[nip] = newPin.trim();
+    writeStorage(KEYS.STAFF_PINS, pins);
+  },
+  hasStaffCustomPin(nip: string): boolean {
+    const pins = this.getStaffPins();
+    return !!pins[nip];
+  },
+
   // Reset to initial demo data
   resetAllData(): void {
     localStorage.removeItem(KEYS.STAFF);
@@ -720,6 +741,7 @@ export const storageService = {
     localStorage.removeItem(KEYS.LINKS);
     localStorage.removeItem(KEYS.KPI);
     localStorage.removeItem(KEYS.ARCHIVE);
+    localStorage.removeItem(KEYS.STAFF_PINS);
     window.location.reload();
   },
 };

@@ -52,6 +52,7 @@ import { ColumnSettingsModal } from './components/modals/ColumnSettingsModal';
 import { BrandCustomizerModal } from './components/modals/BrandCustomizerModal';
 import { PublicInformationPortal } from './components/public/PublicInformationPortal';
 import { PublicShareModal } from './components/modals/PublicShareModal';
+import { ChangePinModal } from './components/modals/ChangePinModal';
 import { ColumnVisibilitySettings } from './services/storageService';
 import { applyDynamicBranding } from './utils/brandingHelper';
 import { AppBrandingSettings } from './types';
@@ -88,6 +89,7 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
   const [isBrandCustomizerOpen, setIsBrandCustomizerOpen] = useState(false);
+  const [isChangePinModalOpen, setIsChangePinModalOpen] = useState(false);
 
   // Public Portal State (Linktree / Guest View: ?view=public)
   const [isPublicView, setIsPublicView] = useState<boolean>(() => {
@@ -824,6 +826,7 @@ export default function App() {
         branding={branding}
         onOpenBrandCustomizer={() => setIsBrandCustomizerOpen(true)}
         onOpenPublicShare={() => setIsPublicShareModalOpen(true)}
+        onOpenChangePin={() => setIsChangePinModalOpen(true)}
       />
 
       {/* Sidebar for Desktop / Tablet */}
@@ -966,6 +969,7 @@ export default function App() {
               onDeleteLink={handleDeleteLink}
               selectedStaffNip={viewingProfileNip}
               currentUser={currentUser}
+              onOpenChangePin={() => setIsChangePinModalOpen(true)}
             />
           )}
 
@@ -1113,6 +1117,13 @@ export default function App() {
         isOpen={isPublicShareModalOpen}
         onClose={() => setIsPublicShareModalOpen(false)}
         appName={branding?.appName}
+      />
+
+      {/* Change PIN Modal (Staff Self-Service) */}
+      <ChangePinModal
+        isOpen={isChangePinModalOpen}
+        onClose={() => setIsChangePinModalOpen(false)}
+        currentUser={currentUser}
       />
 
       {/* Offline Status Toast */}
