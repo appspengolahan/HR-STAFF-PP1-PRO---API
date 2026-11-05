@@ -835,7 +835,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
       {/* ============================================================== */}
       {/* 2. GRAFIK BALOK MENYAMPING RANKING KEHADIRAN SELURUH KARYAWAN  */}
       {/* ============================================================== */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4 print:border-none print:shadow-none print:p-0 print:space-y-3 print:break-before-page">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
@@ -908,13 +908,13 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
             &ge; 98.0% (Sangat Baik / Sempurna)
           </span>
-          <span className="ml-auto text-slate-400 text-[11px] font-mono no-print">
+          <span className="ml-auto text-slate-400 dark:text-slate-500 text-[11px] font-mono print:text-black print:font-bold">
             Total {allStaffRanked.length} Staf Ditampilkan
           </span>
         </div>
 
-        {/* The Horizontal Bar Chart Rows (Balok Menyamping Seluruh Karyawan) */}
-        <div className="space-y-2.5 max-h-[620px] overflow-y-auto pr-1">
+        {/* The Horizontal Bar Chart Rows (Balok Menyamping Seluruh Karyawan Tanpa Slider / Utuh) */}
+        <div className="space-y-2 print:space-y-1.5">
           {allStaffRanked.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-xs">
               Tidak ada karyawan yang cocok dengan kriteria pencarian.
@@ -991,21 +991,21 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
               return (
                 <div
                   key={st.nip}
-                  className="p-2.5 sm:p-3 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800 transition-all flex flex-col md:flex-row md:items-center gap-2 md:gap-4 text-xs"
+                  className="p-2 sm:p-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800 transition-all flex flex-col md:flex-row md:items-center gap-2 md:gap-4 text-xs print:flex-row print:items-center print:gap-3 print:p-1.5 print:bg-white print:border-slate-300 break-inside-avoid print:break-inside-avoid"
                 >
                   {/* Rank & Identitas */}
-                  <div className="flex items-center gap-2.5 w-full md:w-64 shrink-0 min-w-0">
+                  <div className="flex items-center gap-2.5 w-full md:w-64 shrink-0 min-w-0 print:w-56">
                     <span
-                      className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${rankBadgeClass}`}
+                      className={`w-7 h-7 rounded-lg font-black text-xs flex items-center justify-center shrink-0 ${rankBadgeClass} print:print-color-adjust-exact`}
                       title={sortDirection === 'asc' ? `Urutan Prioritas #${idx + 1}` : `Peringkat #${originalRank}`}
                     >
                       {rankContent}
                     </span>
                     <div className="truncate min-w-0">
-                      <div className="font-bold text-slate-900 dark:text-white truncate">
+                      <div className="font-bold text-slate-900 dark:text-white truncate print:text-black">
                         {st.nama}
                       </div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate print:text-slate-600">
                         {st.nip} • {st.jabatan}
                       </div>
                     </div>
@@ -1013,28 +1013,28 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
 
                   {/* Horizontal Bar (Balok Menyamping) */}
                   <div className="flex-1 min-w-0 flex items-center gap-3">
-                    <div className="flex-1 bg-slate-200 dark:bg-slate-700/60 rounded-full h-4 overflow-hidden relative p-0.5">
+                    <div className="flex-1 bg-slate-200 dark:bg-slate-700/60 rounded-full h-4 overflow-hidden relative p-0.5 print:h-3 print:bg-slate-100 print:border print:border-slate-300">
                       <div
                         style={{ width: `${scaledBarWidth}%` }}
-                        className={`h-full rounded-full bg-gradient-to-r ${barGradient} transition-all duration-700 relative`}
+                        className={`h-full rounded-full bg-gradient-to-r ${barGradient} transition-all duration-700 relative print:print-color-adjust-exact`}
                       ></div>
                     </div>
                   </div>
 
                   {/* Nilai Persentase, Jam Izin & Status Badge */}
-                  <div className="flex items-center justify-between md:justify-end gap-3 shrink-0 w-full md:w-56 text-right">
-                    <div className="text-left md:text-right">
-                      <span className="font-mono font-black text-sm text-slate-900 dark:text-white">
+                  <div className="flex items-center justify-between md:justify-end gap-3 shrink-0 w-full md:w-56 text-right print:w-48 print:justify-end">
+                    <div className="text-left md:text-right print:text-right">
+                      <span className="font-mono font-black text-sm text-slate-900 dark:text-white print:text-black">
                         {formatPctIndo(st.pctKehadiran)}
                       </span>
-                      <span className="block text-[10px] text-slate-500 font-mono">
+                      <span className="block text-[10px] text-slate-500 font-mono print:text-slate-600">
                         {st.totalIjinPeriode > 0
                           ? `Ijin: ${Math.round(st.totalIjinPeriode / 60)}j (${st.totalIjinPeriode}m)`
                           : 'Ijin: 0 m'}
                       </span>
                     </div>
 
-                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold shrink-0 ${badgeColor}`}>
+                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold shrink-0 ${badgeColor} print:print-color-adjust-exact`}>
                       {statusText}
                     </span>
                   </div>
@@ -1048,7 +1048,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
       {/* ============================================================== */}
       {/* 3. TABEL MASTER DETAIL 12 BULAN (MATRIX REKAP LENGKAP)         */}
       {/* ============================================================== */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden print:border-none print:shadow-none print:break-before-page print:overflow-visible">
         <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-950/30">
           <div>
             <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
@@ -1075,7 +1075,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto print:overflow-visible">
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800">
               <tr>
@@ -1103,7 +1103,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
                 const isWarning = st.pctKehadiran < 95;
 
                 return (
-                  <tr key={st.nip} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                  <tr key={st.nip} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 break-inside-avoid print:break-inside-avoid">
                     <td className="py-2.5 px-3 font-sans font-bold text-slate-900 dark:text-white truncate max-w-[160px]">
                       {st.nama}
                     </td>

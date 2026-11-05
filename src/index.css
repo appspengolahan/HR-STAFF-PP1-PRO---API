@@ -123,4 +123,16 @@
     width: 100% !important;
     border-collapse: collapse !important;
   }
+
+  tr,
+  .break-inside-avoid,
+  .print\:break-inside-avoid {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print\:break-before-page {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
 }
