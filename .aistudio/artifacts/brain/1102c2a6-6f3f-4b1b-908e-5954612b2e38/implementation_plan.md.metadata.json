@@ -1,0 +1,6 @@
+{
+  "summary": "Rencana implementasi pembaruan Portal Publik: penggantian label tab menjadi Rekapitulasi Presensi, penambahan 2 grafik balok (Bulan Berjalan & Tahun Berjalan) dengan tombol toggle mandiri default tersembunyi tanpa slider, penambahan tab 10 Kehadiran Terendah, dan optimalisasi ekspor PDF/cetak utuh.",
+  "updatedAt": "2026-11-06T01:57:15.668639664Z",
+  "requestFeedback": true,
+  "userFacing": true
+}
