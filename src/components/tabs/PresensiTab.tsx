@@ -75,6 +75,13 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   const [filterNama, setFilterNama] = useState<string>(isStaffPortal && currentUserNip ? currentUserNip : '');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Evaluasi peran staf (staf dilarang mengedit catatan presensi)
+  const isStaffUser = Boolean(
+    isStaffPortal ||
+    currentUser?.role === 'Staf' ||
+    currentUser?.portalType === 'staff'
+  );
+
   // Identifikasi objek staf pengguna yang sedang login di portal mandiri
   const currentUserStaff = useMemo(() => {
     if (!isStaffPortal) return null;
@@ -375,6 +382,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   }, [editTanggal, editJamAwal, editJamAkhir, editSehariPenuh, editJenisIjin, editLampiranSurat]);
 
   const handleOpenEditModal = (rec: PresensiRecord) => {
+    if (isStaffUser) return;
     setSelectedRecordForEdit(rec);
     const rawTgl = rec.tanggal;
     let isoDate = rawTgl;
@@ -963,14 +971,16 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                               <span>{isPushingRecordId === row.id ? 'Mengirim...' : 'Kirim ke Sheet'}</span>
                             </button>
                           )}
-                          <button
-                            onClick={() => handleOpenEditModal(row)}
-                            title="Edit Data Presensi & Ijin"
-                            className="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                            <span>Edit</span>
-                          </button>
+                          {!isStaffUser && (
+                            <button
+                              onClick={() => handleOpenEditModal(row)}
+                              title="Edit Data Presensi & Ijin"
+                              className="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-100 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => setSelectedRecordForSurat(row)}
                             title="Cetak Formulir Surat Ijin Fisik Resmi (20.5 x 16 cm)"
@@ -1393,7 +1403,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
       )}
 
       {/* Modal Edit Presensi & Ijin */}
-      {selectedRecordForEdit && (
+      {!isStaffUser && selectedRecordForEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
