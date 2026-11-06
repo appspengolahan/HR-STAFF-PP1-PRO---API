@@ -20,6 +20,9 @@ import {
   X,
   KeyRound,
   Lock,
+  Layers,
+  Clock,
+  PieChart,
 } from 'lucide-react';
 import { StaffData, PresensiRecord, LinkArsip, AuthUser } from '../../types';
 import { formatRupiah, NAMA_BULAN_INDO } from '../../services/payrollEngine';
@@ -186,6 +189,51 @@ export const ProfilStaffTab: React.FC<ProfilStaffTabProps> = ({
       curIndex: getIndex(curPct),
       prevIndex: getIndex(prevPct),
       progress,
+    };
+  }, [currentStaff, presensiList]);
+
+  // Breakdown spesifik durasi per jenis izin untuk profil staf terpilih
+  const staffLeaveBreakdown = useMemo(() => {
+    if (!currentStaff) return null;
+    const staffRecords = presensiList.filter((p) => p.nip === currentStaff.nip);
+
+    const mapByJenis = new Map<string, { totalMenit: number; frekuensi: number; potonganHariTotal: number }>();
+    let totalMenit = 0;
+    let totalPotonganHari = 0;
+
+    staffRecords.forEach((r) => {
+      const durasi = r.durasiMenit || 0;
+      const pot = Number(r.faktorPotongan) || 0;
+      totalMenit += durasi;
+      totalPotonganHari += pot;
+
+      const jKey = (r.jenisIjin || 'Izin Lainnya').trim();
+      const curr = mapByJenis.get(jKey) || { totalMenit: 0, frekuensi: 0, potonganHariTotal: 0 };
+      curr.totalMenit += durasi;
+      curr.frekuensi += 1;
+      curr.potonganHariTotal += pot;
+      mapByJenis.set(jKey, curr);
+    });
+
+    const items = Array.from(mapByJenis.entries())
+      .map(([jenisIjin, val]) => ({
+        jenisIjin,
+        totalMenit: val.totalMenit,
+        jam: Math.floor(val.totalMenit / 60),
+        sisaMenit: val.totalMenit % 60,
+        frekuensi: val.frekuensi,
+        potonganHariTotal: val.potonganHariTotal,
+      }))
+      .sort((a, b) => b.totalMenit - a.totalMenit);
+
+    return {
+      totalMenit,
+      totalJam: Math.floor(totalMenit / 60),
+      sisaMenit: totalMenit % 60,
+      totalKejadian: staffRecords.length,
+      totalPotonganHari,
+      items,
+      records: [...staffRecords].sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || '')),
     };
   }, [currentStaff, presensiList]);
 
@@ -614,6 +662,165 @@ export const ProfilStaffTab: React.FC<ProfilStaffTabProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Rekapitulasi & Rincian Durasi Jenis Izin Karyawan */}
+        {staffLeaveBreakdown && (
+          <div className="pt-6 border-t border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-500" />
+                  Rekapitulasi & Rincian Durasi Jenis Izin ({currentStaff.nama})
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Rincian akumulasi durasi jam & menit dari tiap jenis izin yang diajukan oleh staf ini.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold px-3 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                  Total Izin: <span className="font-black">{staffLeaveBreakdown.totalJam}j ({staffLeaveBreakdown.totalMenit}m)</span>
+                </span>
+              </div>
+            </div>
+
+            {/* KPI Stat Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800">
+                <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Durasi Izin</div>
+                <div className="text-base font-black text-slate-900 dark:text-white mt-0.5">
+                  {staffLeaveBreakdown.totalJam}j {staffLeaveBreakdown.sisaMenit}m
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono">({staffLeaveBreakdown.totalMenit} menit)</div>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800">
+                <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Frekuensi Kejadian</div>
+                <div className="text-base font-black text-indigo-600 dark:text-indigo-400 mt-0.5">
+                  {staffLeaveBreakdown.totalKejadian} <span className="text-xs font-semibold text-slate-500">kali</span>
+                </div>
+                <div className="text-[10px] text-slate-400">Total surat / log</div>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800">
+                <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Potongan Gaji</div>
+                <div className="text-base font-black text-amber-600 dark:text-amber-400 mt-0.5">
+                  {staffLeaveBreakdown.totalPotonganHari.toFixed(2)} <span className="text-xs font-semibold text-slate-500">hari</span>
+                </div>
+                <div className="text-[10px] text-slate-400">Sesuai aturan operasional</div>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800">
+                <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Varian Jenis Izin</div>
+                <div className="text-base font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  {staffLeaveBreakdown.items.length} <span className="text-xs font-semibold text-slate-500">jenis</span>
+                </div>
+                <div className="text-[10px] text-slate-400">Kategori aktif</div>
+              </div>
+            </div>
+
+            {/* Grid Rincian Tiap Jenis Izin */}
+            {staffLeaveBreakdown.items.length === 0 ? (
+              <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-center text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                Staf ini belum memiliki riwayat izin. Tingkat disiplin kehadiran 100%.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {staffLeaveBreakdown.items.map((it) => {
+                  const pct = staffLeaveBreakdown.totalMenit > 0
+                    ? Math.round((it.totalMenit / staffLeaveBreakdown.totalMenit) * 100)
+                    : 0;
+                  return (
+                    <div
+                      key={it.jenisIjin}
+                      className="p-3.5 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="font-bold text-xs text-slate-900 dark:text-white truncate" title={it.jenisIjin}>
+                            {it.jenisIjin}
+                          </span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300">
+                            {it.frekuensi}x
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-600 dark:text-slate-300">
+                          Durasi: <span className="font-bold text-indigo-600 dark:text-indigo-400">{it.jam}j {it.sisaMenit}m</span> ({it.totalMenit} m)
+                        </div>
+                        {it.potonganHariTotal > 0 && (
+                          <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
+                            Potongan: {it.potonganHariTotal.toFixed(2)} hari
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                          <span>Kontribusi Izin</span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">{pct}%</span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-500 rounded-full"
+                            style={{ width: `${Math.min(pct, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Tabel Log Riwayat Izin */}
+            {staffLeaveBreakdown.records.length > 0 && (
+              <div className="pt-2">
+                <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                  Riwayat Surat & Pencatatan Izin ({staffLeaveBreakdown.records.length} Record)
+                </div>
+                <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[11px] font-bold sticky top-0">
+                      <tr>
+                        <th className="py-2 px-3">Tanggal</th>
+                        <th className="py-2 px-3">Jenis Izin</th>
+                        <th className="py-2 px-3">Jam Izin</th>
+                        <th className="py-2 px-3 text-right">Durasi</th>
+                        <th className="py-2 px-3 text-right">Potongan</th>
+                        <th className="py-2 px-3">Alasan / Keperluan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                      {staffLeaveBreakdown.records.map((r, i) => {
+                        const dMin = r.durasiMenit || 0;
+                        const j = Math.floor(dMin / 60);
+                        const m = dMin % 60;
+                        return (
+                          <tr key={i} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                            <td className="py-1.5 px-3 whitespace-nowrap font-medium">{r.tanggal} ({r.hari})</td>
+                            <td className="py-1.5 px-3 font-semibold text-indigo-600 dark:text-indigo-400">{r.jenisIjin}</td>
+                            <td className="py-1.5 px-3 whitespace-nowrap font-mono text-[11px]">
+                              {r.jamAwal && r.jamAkhir ? `${r.jamAwal} - ${r.jamAkhir}` : '-'}
+                            </td>
+                            <td className="py-1.5 px-3 text-right font-bold whitespace-nowrap font-mono text-[11px]">
+                              {j > 0 ? `${j}j ` : ''}{m}m
+                            </td>
+                            <td className="py-1.5 px-3 text-right font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                              {r.faktorPotongan ? `${r.faktorPotongan} hr` : '-'}
+                            </td>
+                            <td className="py-1.5 px-3 text-slate-500 dark:text-slate-400 max-w-xs truncate" title={r.keperluan}>
+                              {r.keperluan || '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Link Arsip Administratif (Google Drive) */}
         <div className="pt-6 border-t border-slate-200 dark:border-slate-800 space-y-3">

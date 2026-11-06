@@ -12,6 +12,12 @@ import {
   Filter,
   ArrowUpDown,
   Flame,
+  Layers,
+  FileText,
+  PieChart,
+  UserCheck,
+  X,
+  ChevronRight,
 } from 'lucide-react';
 import { PresensiRecord, StaffData } from '../../types';
 import { NAMA_BULAN_INDO } from '../../services/payrollEngine';
@@ -49,6 +55,10 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
   // Toggle for Line Trend Chart Metric
   const [trendMetric, setTrendMetric] = useState<'kehadiran' | 'ijin'>('kehadiran');
   const [tableShowAllMonths, setTableShowAllMonths] = useState<boolean>(false);
+
+  // Modal Rincian Spesifik Jenis Izin Staf
+  const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
+  const [modalStaffNip, setModalStaffNip] = useState<string>('');
 
   const monthsShort = useMemo(
     () => ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
@@ -144,6 +154,97 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
   const selectedStaff = useMemo(() => {
     return effectiveNip ? staffList.find((s) => s.nip === effectiveNip) : null;
   }, [staffList, effectiveNip]);
+
+  // Kalkulasi Spesifik Rincian Durasi Per Jenis Izin untuk Staf Tertentu
+  const computeStaffLeaveBreakdown = (targetNip: string) => {
+    if (!targetNip) return null;
+    const targetStaff = staffList.find((s) => s.nip === targetNip);
+    if (!targetStaff) return null;
+
+    const minB = Math.min(bulanAwal, bulanAkhir);
+    const maxB = Math.max(bulanAwal, bulanAkhir);
+
+    const staffRecords = normalizedPresensiList.filter((p) => {
+      const matchNip = p.nip === targetNip || (p.nama && p.nama.trim().toLowerCase() === targetStaff.nama.trim().toLowerCase());
+      const matchYear = p.tahun === filterTahun;
+      const matchMonth = p.bulan >= minB && p.bulan <= maxB;
+      return matchNip && matchYear && matchMonth;
+    });
+
+    const breakdownMap = new Map<string, {
+      jenisIjin: string;
+      count: number;
+      totalMenit: number;
+      totalJam: number;
+      potonganCount: number;
+      records: PresensiRecord[];
+    }>();
+
+    staffRecords.forEach((rec) => {
+      const jenis = (rec.jenisIjin || 'Izin Lainnya').trim();
+      const curr = breakdownMap.get(jenis) || {
+        jenisIjin: jenis,
+        count: 0,
+        totalMenit: 0,
+        totalJam: 0,
+        potonganCount: 0,
+        records: [],
+      };
+
+      curr.count += 1;
+      curr.totalMenit += (rec.durasiMenit || 0);
+      if ((rec.faktorPotongan || 0) > 0) {
+        curr.potonganCount += 1;
+      }
+      curr.records.push(rec);
+      breakdownMap.set(jenis, curr);
+    });
+
+    const totalStaffMenit = staffRecords.reduce((acc, r) => acc + (r.durasiMenit || 0), 0);
+    const totalStaffJam = Math.round((totalStaffMenit / 60) * 10) / 10;
+    const totalPotonganHari = staffRecords.reduce((acc, r) => acc + (r.faktorPotongan || 0), 0);
+
+    const items = Array.from(breakdownMap.values()).map((item) => {
+      const jam = Math.floor(item.totalMenit / 60);
+      const sisaMenit = item.totalMenit % 60;
+      const pct = totalStaffMenit > 0
+        ? Math.round((item.totalMenit / totalStaffMenit) * 1000) / 10
+        : 0;
+      const potonganHariTotal = item.records.reduce((acc, r) => acc + (r.faktorPotongan || 0), 0);
+      return {
+        ...item,
+        totalJam: Math.round((item.totalMenit / 60) * 10) / 10,
+        jam,
+        sisaMenit,
+        frekuensi: item.count,
+        potonganHariTotal,
+        percentageOfTotalLeave: pct,
+      };
+    }).sort((a, b) => b.totalMenit - a.totalMenit);
+
+    return {
+      staff: targetStaff,
+      totalKejadian: staffRecords.length,
+      totalMenit: totalStaffMenit,
+      totalJam: totalStaffJam,
+      totalPotonganHari,
+      items,
+      records: staffRecords.sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()),
+    };
+  };
+
+  const openBreakdownForStaff = (nip: string) => {
+    setModalStaffNip(nip);
+    setIsBreakdownModalOpen(true);
+  };
+
+  const selectedStaffBreakdown = useMemo(() => {
+    return effectiveNip ? computeStaffLeaveBreakdown(effectiveNip) : null;
+  }, [effectiveNip, normalizedPresensiList, filterTahun, bulanAwal, bulanAkhir, staffList]);
+
+  const modalStaffBreakdown = useMemo(() => {
+    return modalStaffNip ? computeStaffLeaveBreakdown(modalStaffNip) : null;
+  }, [modalStaffNip, normalizedPresensiList, filterTahun, bulanAwal, bulanAkhir, staffList]);
 
   // 3. Calculate Monthly Trend (Jan - Des) across active staff or filtered individual staff
   const monthlyTrendData = useMemo(() => {
@@ -497,27 +598,52 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
             </div>
 
             {!isStaffPortal && (
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
-                  Filter Staf Khusus
-                </label>
-                <select
-                  value={filterStaffNip}
-                  onChange={(e) => setFilterStaffNip(e.target.value)}
-                  className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white max-w-[200px]"
-                >
-                  <option value="">-- Semua 32 Staf --</option>
-                  {staffList.map((s) => (
-                    <option key={s.nip} value={s.nip}>
-                      {s.nama}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex items-end gap-1.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                    Filter Staf Khusus
+                  </label>
+                  <select
+                    value={filterStaffNip}
+                    onChange={(e) => setFilterStaffNip(e.target.value)}
+                    className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white max-w-[200px]"
+                  >
+                    <option value="">-- Semua 32 Staf --</option>
+                    {staffList.map((s) => (
+                      <option key={s.nip} value={s.nip}>
+                        {s.nama}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {filterStaffNip && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterStaffNip('')}
+                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                    title="Kembali ke semua 32 staf"
+                  >
+                    Semua
+                  </button>
+                )}
               </div>
             )}
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setModalStaffNip(filterStaffNip || staffList[0]?.nip || '');
+                setIsBreakdownModalOpen(true);
+              }}
+              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+              title="Lihat rincian durasi tiap-tiap jenis izin staf"
+            >
+              <Layers className="w-4 h-4" />
+              <span>Rincian Jenis Izin Staf</span>
+            </button>
+
             <button
               onClick={handleExportPdf}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
@@ -609,6 +735,184 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ============================================================== */}
+      {/* PANEL RINCIAN SPESIFIK DURASI PER JENIS IZIN STAF TERPILIH     */}
+      {/* ============================================================== */}
+      {selectedStaff && selectedStaffBreakdown && (
+        <div className="bg-white dark:bg-slate-900 border-2 border-indigo-200 dark:border-indigo-900/60 rounded-2xl p-5 sm:p-6 shadow-md space-y-5 transition-all">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                    Rincian Spesifik Durasi Izin — {selectedStaff.nama}
+                  </h2>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300">
+                    {selectedStaff.nip} • {selectedStaff.sekup}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Distribusi durasi jam & menit per jenis izin pada tahun {filterTahun}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                Total Izin: <span className="text-indigo-600 dark:text-indigo-400 font-black">{Math.round(selectedStaffBreakdown.totalMenit / 60)}j ({selectedStaffBreakdown.totalMenit}m)</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setFilterStaffNip('all')}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors"
+              >
+                Reset ke Semua Staf
+              </button>
+            </div>
+          </div>
+
+          {/* KPI Mini Staf Izin */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">Total Durasi Izin</span>
+              <span className="text-lg font-black text-slate-900 dark:text-white">
+                {Math.round(selectedStaffBreakdown.totalMenit / 60)}j <span className="text-xs font-semibold text-slate-500">({selectedStaffBreakdown.totalMenit} m)</span>
+              </span>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">Frekuensi Izin</span>
+              <span className="text-lg font-black text-indigo-600 dark:text-indigo-400">
+                {selectedStaffBreakdown.totalKejadian} <span className="text-xs font-semibold text-slate-500">kejadian</span>
+              </span>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">Akumulasi Potongan</span>
+              <span className="text-lg font-black text-amber-600 dark:text-amber-400">
+                {selectedStaffBreakdown.totalPotonganHari.toFixed(2)} <span className="text-xs font-semibold text-slate-500">hari</span>
+              </span>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">Variasi Jenis Izin</span>
+              <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">
+                {selectedStaffBreakdown.items.length} <span className="text-xs font-semibold text-slate-500">kategori</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Rincian Per Jenis Izin (Cards Grid) */}
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-indigo-500" />
+              Rincian Durasi Tiap Jenis Izin
+            </h3>
+            {selectedStaffBreakdown.items.length === 0 ? (
+              <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-center text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                Tidak ada catatan izin untuk {selectedStaff.nama} pada periode {filterTahun}. (Presensi 100% disiplin)
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {selectedStaffBreakdown.items.map((it) => {
+                  const pct = selectedStaffBreakdown.totalMenit > 0
+                    ? Math.round((it.totalMenit / selectedStaffBreakdown.totalMenit) * 100)
+                    : 0;
+                  return (
+                    <div
+                      key={it.jenisIjin}
+                      className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="font-bold text-sm text-slate-900 dark:text-white truncate" title={it.jenisIjin}>
+                            {it.jenisIjin}
+                          </span>
+                          <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                            {it.frekuensi}x
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                          Total: <span className="font-bold text-indigo-600 dark:text-indigo-400">{it.jam} jam {it.sisaMenit} menit</span> ({it.totalMenit} m)
+                        </div>
+                        {it.potonganHariTotal > 0 && (
+                          <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
+                            Potongan: {it.potonganHariTotal.toFixed(2)} hari
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-700/60">
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+                          <span>Porsi dari total izin</span>
+                          <span className="font-bold">{pct}%</span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-500 rounded-full"
+                            style={{ width: `${Math.min(pct, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Tabel Log Riwayat Izin Staf Terpilih */}
+          {selectedStaffBreakdown.records.length > 0 && (
+            <div className="pt-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2.5">
+                Log Catatan Izin {selectedStaff.nama} ({selectedStaffBreakdown.records.length} Record)
+              </h3>
+              <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[11px] font-bold sticky top-0">
+                    <tr>
+                      <th className="py-2 px-3">Tanggal</th>
+                      <th className="py-2 px-3">Jenis Izin</th>
+                      <th className="py-2 px-3">Jam / Rentang</th>
+                      <th className="py-2 px-3 text-right">Durasi</th>
+                      <th className="py-2 px-3 text-right">Potongan</th>
+                      <th className="py-2 px-3">Keterangan</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                    {selectedStaffBreakdown.records.map((r, idx) => {
+                      const durasiMin = r.durasiMenit || 0;
+                      const jam = Math.floor(durasiMin / 60);
+                      const mnt = durasiMin % 60;
+                      return (
+                        <tr key={idx} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                          <td className="py-1.5 px-3 font-semibold whitespace-nowrap">{r.tanggal} ({r.hari})</td>
+                          <td className="py-1.5 px-3">
+                            <span className="font-semibold text-indigo-600 dark:text-indigo-400">{r.jenisIjin}</span>
+                          </td>
+                          <td className="py-1.5 px-3 whitespace-nowrap">
+                            {r.jamAwal && r.jamAkhir ? `${r.jamAwal} - ${r.jamAkhir}` : '-'}
+                          </td>
+                          <td className="py-1.5 px-3 text-right font-bold whitespace-nowrap">
+                            {jam > 0 ? `${jam}j ` : ''}{mnt}m ({durasiMin}m)
+                          </td>
+                          <td className="py-1.5 px-3 text-right font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                            {r.faktorPotongan ? `${r.faktorPotongan} hr` : '-'}
+                          </td>
+                          <td className="py-1.5 px-3 text-slate-500 dark:text-slate-400 max-w-xs truncate" title={r.keperluan}>
+                            {r.keperluan || '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ============================================================== */}
       {/* 1. GRAFIS TREN TINGKAT KEHADIRAN BULANAN (GRAFIK GARIS GAMBAR 1) */}
@@ -1104,8 +1408,20 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
 
                 return (
                   <tr key={st.nip} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 break-inside-avoid print:break-inside-avoid">
-                    <td className="py-2.5 px-3 font-sans font-bold text-slate-900 dark:text-white truncate max-w-[160px]">
-                      {st.nama}
+                    <td className="py-2.5 px-3 font-sans truncate max-w-[180px]">
+                      <button
+                        type="button"
+                        onClick={() => openBreakdownForStaff(st.nip)}
+                        className="text-left font-bold text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 group inline-flex items-center gap-1.5 transition-colors"
+                        title="Klik untuk melihat rincian spesifik jenis izin staf ini"
+                      >
+                        <span className="truncate">{st.nama}</span>
+                        {st.totalIjinPeriode > 0 && (
+                          <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 opacity-80 group-hover:opacity-100">
+                            Rincian
+                          </span>
+                        )}
+                      </button>
                     </td>
                     <td className="py-2.5 px-2 text-slate-400">{st.nip}</td>
                     {displayedMonths.map((m) => {
@@ -1153,6 +1469,195 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
           Divisi Produksi I — PT Batu Karang | Dokumen Evaluasi Resmi
         </div>
       </div>
+
+      {/* ============================================================== */}
+      {/* MODAL POPUP RINCIAN SPESIFIK JENIS IZIN STAF                    */}
+      {/* ============================================================== */}
+      {isBreakdownModalOpen && modalStaffBreakdown && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setIsBreakdownModalOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal */}
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-3 bg-slate-50/60 dark:bg-slate-800/40">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                      Rincian Durasi Jenis Izin — {modalStaffBreakdown.staff.nama}
+                    </h3>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300">
+                      {modalStaffBreakdown.staff.nip}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {modalStaffBreakdown.staff.jabatan} • Bagian: {modalStaffBreakdown.staff.sekup} • Periode {filterTahun}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsBreakdownModalOpen(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                title="Tutup"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Scrollable */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-5">
+              {/* Ringkasan KPI Modal */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+                  <span className="text-[11px] font-semibold text-slate-500 block">Total Durasi</span>
+                  <span className="text-base font-black text-slate-900 dark:text-white">
+                    {Math.round(modalStaffBreakdown.totalMenit / 60)}j ({modalStaffBreakdown.totalMenit}m)
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+                  <span className="text-[11px] font-semibold text-slate-500 block">Frekuensi</span>
+                  <span className="text-base font-black text-indigo-600 dark:text-indigo-400">
+                    {modalStaffBreakdown.totalKejadian} catatan
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+                  <span className="text-[11px] font-semibold text-slate-500 block">Potongan Gaji/Hari</span>
+                  <span className="text-base font-black text-amber-600 dark:text-amber-400">
+                    {modalStaffBreakdown.totalPotonganHari.toFixed(2)} hari
+                  </span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+                  <span className="text-[11px] font-semibold text-slate-500 block">Kategori Izin</span>
+                  <span className="text-base font-black text-emerald-600 dark:text-emerald-400">
+                    {modalStaffBreakdown.items.length} tipe
+                  </span>
+                </div>
+              </div>
+
+              {/* Rincian Tiap Jenis Izin */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2.5">
+                  Rincian Per Tipe Izin
+                </h4>
+                {modalStaffBreakdown.items.length === 0 ? (
+                  <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-center text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                    Staf ini belum pernah mengajukan izin pada periode {filterTahun}. Kehadiran 100%.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {modalStaffBreakdown.items.map((it) => {
+                      const pct = modalStaffBreakdown.totalMenit > 0
+                        ? Math.round((it.totalMenit / modalStaffBreakdown.totalMenit) * 100)
+                        : 0;
+                      return (
+                        <div
+                          key={it.jenisIjin}
+                          className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/60"
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                              {it.jenisIjin}
+                            </span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                              {it.frekuensi}x
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            Durasi: <span className="font-bold text-indigo-600 dark:text-indigo-400">{it.jam}j {it.sisaMenit}m</span> ({it.totalMenit}m)
+                          </div>
+                          {it.potonganHariTotal > 0 && (
+                            <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
+                              Potongan: {it.potonganHariTotal.toFixed(2)} hari
+                            </div>
+                          )}
+                          <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[10px] text-slate-400">
+                            <span>Porsi Izin</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-300">{pct}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Log Detail */}
+              {modalStaffBreakdown.records.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">
+                    Daftar Riwayat Izin ({modalStaffBreakdown.records.length} Record)
+                  </h4>
+                  <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+                    <table className="w-full text-left">
+                      <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[11px] font-bold sticky top-0">
+                        <tr>
+                          <th className="py-2 px-3">Tanggal</th>
+                          <th className="py-2 px-3">Jenis Izin</th>
+                          <th className="py-2 px-3">Jam</th>
+                          <th className="py-2 px-3 text-right">Durasi</th>
+                          <th className="py-2 px-3 text-right">Potongan</th>
+                          <th className="py-2 px-3">Alasan</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                        {modalStaffBreakdown.records.map((r, i) => {
+                          const dMin = r.durasiMenit || 0;
+                          return (
+                            <tr key={i} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                              <td className="py-1.5 px-3 whitespace-nowrap">{r.tanggal}</td>
+                              <td className="py-1.5 px-3 font-semibold text-indigo-600 dark:text-indigo-400">{r.jenisIjin}</td>
+                              <td className="py-1.5 px-3 whitespace-nowrap">
+                                {r.jamAwal && r.jamAkhir ? `${r.jamAwal} - ${r.jamAkhir}` : '-'}
+                              </td>
+                              <td className="py-1.5 px-3 text-right font-bold whitespace-nowrap">{dMin}m</td>
+                              <td className="py-1.5 px-3 text-right text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                                {r.faktorPotongan ? `${r.faktorPotongan} hr` : '-'}
+                              </td>
+                              <td className="py-1.5 px-3 text-slate-500 max-w-xs truncate">{r.keperluan || '-'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Modal */}
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterStaffNip(modalStaffBreakdown.staff.nip);
+                  setIsBreakdownModalOpen(false);
+                }}
+                className="text-xs font-semibold px-3 py-1.5 rounded-xl text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
+              >
+                Tampilkan di Filter Rekap Utama
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsBreakdownModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-black dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 text-white font-bold text-xs transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

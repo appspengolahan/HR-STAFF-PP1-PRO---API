@@ -56,17 +56,20 @@ const KEYS = {
   THEME_MODE: 'bk_hr_theme_mode_v3',
   SIDEBAR_COLLAPSED: 'bk_hr_sidebar_collapsed_v3',
   COLUMN_SETTINGS: 'bk_hr_column_settings_v4',
-  BRANDING: 'bk_hr_app_branding_v1',
-  STAFF_PINS: 'bk_hr_staff_pins_v1',
+  BRANDING: 'bk_hr_app_branding_v3',
+  STAFF_PINS: 'bk_hr_staff_pins_v3',
 };
 
 export const DEFAULT_STAFF_PIN = '123456';
 
-// Cleanup old obsolete v1 and v2 keys
+// Cleanup old obsolete v1 and v2 keys (PENTING: Jangan hapus staff_pins atau branding)
 if (typeof window !== 'undefined' && window.localStorage) {
   try {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
+      if (k && (k.includes('staff_pins') || k.includes('branding'))) {
+        continue; // Lindungi PIN staf dan branding agar tidak terhapus saat refresh
+      }
       if (k && k.startsWith('bk_hr_') && (k.endsWith('_v1') || k.endsWith('_v2') || k.endsWith('_mock'))) {
         localStorage.removeItem(k);
       }
@@ -734,7 +737,22 @@ export const storageService = {
 
   // Staff PIN Authentication (Portal Mandiri Staf 3-Factor Login)
   getStaffPins(): Record<string, string> {
-    return readStorage<Record<string, string>>(KEYS.STAFF_PINS, {});
+    const pins = readStorage<Record<string, string>>(KEYS.STAFF_PINS, {});
+    if (Object.keys(pins).length === 0 && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const v1 = localStorage.getItem('bk_hr_staff_pins_v1');
+        if (v1) {
+          const parsed = JSON.parse(v1);
+          if (parsed && typeof parsed === 'object') {
+            writeStorage(KEYS.STAFF_PINS, parsed);
+            return parsed;
+          }
+        }
+      } catch (e) {
+        // Ignore fallback error
+      }
+    }
+    return pins;
   },
   getStaffPin(nip: string): string {
     const pins = this.getStaffPins();
