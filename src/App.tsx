@@ -53,6 +53,7 @@ import { BrandCustomizerModal } from './components/modals/BrandCustomizerModal';
 import { PublicInformationPortal } from './components/public/PublicInformationPortal';
 import { PublicShareModal } from './components/modals/PublicShareModal';
 import { ChangePinModal } from './components/modals/ChangePinModal';
+import { QrLoginModal, QrTargetType } from './components/modals/QrLoginModal';
 import { ColumnVisibilitySettings } from './services/storageService';
 import { applyDynamicBranding } from './utils/brandingHelper';
 import { AppBrandingSettings } from './types';
@@ -100,6 +101,33 @@ export default function App() {
 
   const [isPublicShareModalOpen, setIsPublicShareModalOpen] = useState(false);
   const [loginGateInitialGate, setLoginGateInitialGate] = useState<'management' | 'staff'>('management');
+
+  // High-Precision QR Code Modal State
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [qrModalTarget, setQrModalTarget] = useState<QrTargetType>('staff-login');
+
+  const handleOpenQrModal = (target: QrTargetType = 'staff-login') => {
+    setQrModalTarget(target);
+    setIsQrModalOpen(true);
+  };
+
+  // URL Query Listener for Staf Scan QR (?view=login&gate=staff)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get('view');
+    const gateParam = params.get('gate');
+
+    if (viewParam === 'login' || gateParam === 'staff' || gateParam === 'management') {
+      setIsPublicView(false);
+      setIsLoginModalOpen(true);
+      if (gateParam === 'staff' || viewParam === 'login-staff') {
+        setLoginGateInitialGate('staff');
+      } else if (gateParam === 'management') {
+        setLoginGateInitialGate('management');
+      }
+    }
+  }, []);
 
   const handleOpenPublicPortal = () => {
     setIsPublicView(true);
@@ -785,6 +813,12 @@ export default function App() {
           presensiList={presensiList}
           branding={branding}
           onOpenLogin={handleBackToLoginFromPublic}
+          onOpenQrLogin={() => handleOpenQrModal('staff-login')}
+        />
+        <QrLoginModal
+          isOpen={isQrModalOpen}
+          onClose={() => setIsQrModalOpen(false)}
+          defaultTarget={qrModalTarget}
         />
         <AppDialogModal />
       </>
@@ -827,6 +861,7 @@ export default function App() {
         onOpenBrandCustomizer={() => setIsBrandCustomizerOpen(true)}
         onOpenPublicShare={() => setIsPublicShareModalOpen(true)}
         onOpenChangePin={() => setIsChangePinModalOpen(true)}
+        onOpenQrLogin={handleOpenQrModal}
       />
 
       {/* Sidebar for Desktop / Tablet */}
@@ -1117,6 +1152,14 @@ export default function App() {
         isOpen={isPublicShareModalOpen}
         onClose={() => setIsPublicShareModalOpen(false)}
         appName={branding?.appName}
+        onOpenQrLogin={() => handleOpenQrModal('staff-login')}
+      />
+
+      {/* High-Precision QR Code Login Modal (Expandable & HD Download) */}
+      <QrLoginModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        defaultTarget={qrModalTarget}
       />
 
       {/* Change PIN Modal (Staff Self-Service) */}

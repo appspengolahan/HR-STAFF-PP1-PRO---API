@@ -23,6 +23,10 @@ import {
   UserCheck,
   Globe,
   KeyRound,
+  QrCode,
+  Copy,
+  Check,
+  Lock,
 } from 'lucide-react';
 import { AuthUser, AppBrandingSettings, UserRole } from '../types';
 import { usePWAInstall } from '../hooks/usePWAInstall';
@@ -53,6 +57,7 @@ interface NavbarProps {
   onOpenBrandCustomizer?: () => void;
   onOpenPublicShare?: () => void;
   onOpenChangePin?: () => void;
+  onOpenQrLogin?: (target?: 'staff-login' | 'management-login' | 'public-portal') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -80,12 +85,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenBrandCustomizer,
   onOpenPublicShare,
   onOpenChangePin,
+  onOpenQrLogin,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isAccessDropdownOpen, setIsAccessDropdownOpen] = useState(false);
+  const [copiedLinkType, setCopiedLinkType] = useState<'staff' | 'public' | null>(null);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const accessDropdownRef = useRef<HTMLDivElement>(null);
   const { isInstallable, isInstalled, install } = usePWAInstall();
 
   // Fullscreen event listener
@@ -95,28 +104,48 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
-  // Outside click & Escape key listener to close dropdown
+  // Outside click & Escape key listener to close dropdowns
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         setIsDropdownOpen(false);
+      }
+      if (accessDropdownRef.current && !accessDropdownRef.current.contains(target)) {
+        setIsAccessDropdownOpen(false);
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsDropdownOpen(false);
+        setIsAccessDropdownOpen(false);
       }
     };
 
-    if (isDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleKeyDown);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isDropdownOpen]);
+  }, []);
+
+  const handleCopyLink = async (type: 'staff' | 'public') => {
+    if (typeof window === 'undefined') return;
+    const origin = window.location.origin;
+    const path = window.location.pathname;
+    const url = type === 'staff'
+      ? `${origin}${path}?view=login&gate=staff`
+      : `${origin}${path}?view=public`;
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLinkType(type);
+      setTimeout(() => setCopiedLinkType(null), 2000);
+    } catch {
+      // fallback
+    }
+  };
 
   const handleToggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -267,20 +296,180 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </button>
 
-        {/* Tombol Bagikan Portal Publik (Linktree) */}
-        {onOpenPublicShare && (
-          <button
-            onClick={onOpenPublicShare}
-            title="Buka &amp; Salin tautan Portal Informasi Publik (Linktree)"
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 transition-all cursor-pointer select-none text-xs font-semibold shadow-xs"
-          >
-            <Globe className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span className="hidden lg:inline-block">Portal Publik</span>
-            <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-emerald-200/80 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">
-              Linktree
-            </span>
-          </button>
-        )}
+        {/* GRUP AKSES PUBLIK & QR CODE LOGIN STAF */}
+        <div className="relative hidden sm:flex items-center" ref={accessDropdownRef}>
+          <div className="inline-flex rounded-xl p-0.5 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 shadow-xs">
+            {/* Tombol QR Code Login Staf */}
+            {onOpenQrLogin && (
+              <button
+                type="button"
+                onClick={() => onOpenQrLogin('staff-login')}
+                title="Buka QR Code Login Staf (Bisa di-expand ke layar penuh & di-download HD untuk scan staf)"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all cursor-pointer select-none text-xs font-bold shadow-xs active:scale-95"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline-block">QR Login</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded font-black bg-white/20 text-white">
+                  Scan
+                </span>
+              </button>
+            )}
+
+            {/* Tombol Portal Publik Linktree */}
+            {onOpenPublicShare && (
+              <button
+                type="button"
+                onClick={onOpenPublicShare}
+                title="Buka &amp; Salin tautan Portal Informasi Publik (Linktree)"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-emerald-700 dark:text-emerald-300 transition-all cursor-pointer select-none text-xs font-semibold"
+              >
+                <Globe className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span className="hidden xl:inline-block">Portal Publik</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
+                  Linktree
+                </span>
+              </button>
+            )}
+
+            {/* Tombol Chevron Dropdown Dinamis Terpadu */}
+            <button
+              type="button"
+              onClick={() => setIsAccessDropdownOpen((prev) => !prev)}
+              title="Pilihan Akses Cepat: QR Code Staf, Manajemen, &amp; Link Publik"
+              className={`px-1.5 py-1.5 rounded-lg transition-colors cursor-pointer text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white ${
+                isAccessDropdownOpen ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400' : 'hover:bg-slate-200/60 dark:hover:bg-slate-700'
+              }`}
+            >
+              <ChevronDown
+                className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                  isAccessDropdownOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* POPOVER MENU DROPDOWN DINAMIS AKSES & QR */}
+          {isAccessDropdownOpen && (
+            <div className="absolute right-0 top-full mt-2 w-72 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 text-xs text-slate-800 dark:text-slate-100 space-y-1">
+              <div className="px-2.5 py-1.5 border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Pusat Akses QR &amp; Portal
+              </div>
+
+              {/* Opsi 1: QR Login Staf */}
+              {onOpenQrLogin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAccessDropdownOpen(false);
+                    onOpenQrLogin('staff-login');
+                  }}
+                  className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-950/50 text-slate-800 dark:text-slate-100 transition-colors text-left cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <QrCode className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-xs">QR Code Login Staf</div>
+                      <div className="text-[10px] text-slate-400">Expand &amp; Download HD Siap Cetak</div>
+                    </div>
+                  </div>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-blue-600 text-white">
+                    Scan
+                  </span>
+                </button>
+              )}
+
+              {/* Opsi 2: Portal Publik Linktree */}
+              {onOpenPublicShare && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAccessDropdownOpen(false);
+                    onOpenPublicShare();
+                  }}
+                  className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-slate-800 dark:text-slate-100 transition-colors text-left cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Globe className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-xs">Portal Publik (Linktree)</div>
+                      <div className="text-[10px] text-slate-400">Tampilan Tamu Tanpa Password</div>
+                    </div>
+                  </div>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                    Buka
+                  </span>
+                </button>
+              )}
+
+              {/* Opsi 3: QR Login Manajemen / HR */}
+              {onOpenQrLogin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAccessDropdownOpen(false);
+                    onOpenQrLogin('management-login');
+                  }}
+                  className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-800 dark:text-slate-100 transition-colors text-left cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-xs">QR Login Manajemen</div>
+                      <div className="text-[10px] text-slate-400">Akses Khusus Admin &amp; Pimpinan</div>
+                    </div>
+                  </div>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                    HR
+                  </span>
+                </button>
+              )}
+
+              {/* Fast Copy Actions */}
+              <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleCopyLink('staff')}
+                  className="p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                >
+                  {copiedLinkType === 'staff' ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-500" />
+                      <span>Tersalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Salin Link Staf</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCopyLink('public')}
+                  className="p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                >
+                  {copiedLinkType === 'public' ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-500" />
+                      <span>Tersalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Salin Link Publik</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* SATU TOGGLE DROPDOWN TERPADU: PUSAT KONTROL & PROFIL */}
         <div className="relative" ref={dropdownRef}>
@@ -556,6 +745,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                     <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
                       Linktree
+                    </span>
+                  </button>
+                )}
+
+                {onOpenQrLogin && (
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onOpenQrLogin('staff-login');
+                    }}
+                    className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors text-left cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                        <QrCode className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-xs">QR Code Presisi Tinggi</div>
+                        <div className="text-[10px] text-slate-400">Expand &amp; Unduh HD Scan Staf</div>
+                      </div>
+                    </div>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                      QR HD
                     </span>
                   </button>
                 )}

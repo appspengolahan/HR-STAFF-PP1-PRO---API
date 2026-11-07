@@ -27,6 +27,7 @@ import {
   ArrowUpDown,
   Award,
   Medal,
+  QrCode,
 } from 'lucide-react';
 import { StaffData, PresensiRecord, AppBrandingSettings } from '../../types';
 import { formatTanggalIndo, normalizeIsoDate } from '../../utils/dateFormatter';
@@ -41,6 +42,7 @@ interface PublicInformationPortalProps {
   presensiList: PresensiRecord[];
   branding: AppBrandingSettings;
   onOpenLogin: () => void;
+  onOpenQrLogin?: () => void;
 }
 
 export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = ({
@@ -48,6 +50,7 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
   presensiList = [],
   branding,
   onOpenLogin,
+  onOpenQrLogin,
 }) => {
   // 1. Date Selection State
   // Default to today's date formatted as YYYY-MM-DD in local time
@@ -549,6 +552,18 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
               <Printer className="w-3.5 h-3.5 text-slate-400" />
               <span>Cetak (PDF)</span>
             </button>
+
+            {onOpenQrLogin && (
+              <button
+                type="button"
+                onClick={onOpenQrLogin}
+                title="Tampilkan QR Code Presisi Tinggi untuk scan login staf"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-500/30 text-xs font-bold transition-all cursor-pointer shadow-xs"
+              >
+                <QrCode className="w-3.5 h-3.5 text-blue-400" />
+                <span className="hidden sm:inline">QR Login</span>
+              </button>
+            )}
 
             <button
               onClick={onOpenLogin}

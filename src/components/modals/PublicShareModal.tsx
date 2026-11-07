@@ -10,6 +10,7 @@ import {
   Smartphone,
   Eye,
   CheckCircle2,
+  QrCode,
 } from 'lucide-react';
 import { appAlert } from '../../services/dialogService';
 
@@ -17,12 +18,14 @@ interface PublicShareModalProps {
   isOpen: boolean;
   onClose: () => void;
   appName?: string;
+  onOpenQrLogin?: () => void;
 }
 
 export const PublicShareModal: React.FC<PublicShareModalProps> = ({
   isOpen,
   onClose,
   appName = 'HR STAFF - PRODUKSI I',
+  onOpenQrLogin,
 }) => {
   const [isCopied, setIsCopied] = useState(false);
 
@@ -145,7 +148,20 @@ export const PublicShareModal: React.FC<PublicShareModalProps> = ({
               Optimal diakses lewat layar HP &amp; Desktop
             </span>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              {onOpenQrLogin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenQrLogin();
+                  }}
+                  className="flex-1 sm:flex-initial px-3.5 py-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>QR Code Login Staf</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onClose}
