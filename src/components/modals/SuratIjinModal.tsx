@@ -42,7 +42,9 @@ export const SuratIjinModal: React.FC<SuratIjinModalProps> = ({
   const isEkstern =
     String(record.catatan || '').toLowerCase().includes('ekstern') ||
     String(record.keperluan || '').toLowerCase().includes('ekstern');
-  const isFormKehadiran = record.jenisIjin === 'Hadir';
+  const isFormKehadiran =
+    record.jenisIjin === 'Hadir' ||
+    record.lampiranSurat === 'Form Izin Perusahaan';
 
   // Waktu pelaksanaan spesifik
   let jamMasukDisplay = '-';

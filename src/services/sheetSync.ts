@@ -217,7 +217,12 @@ export const sheetSyncService = {
           const durasi = Math.round(parseFloat((r[8] || '0').replace(/[^0-9.]/g, '')) || 0);
           const jenisIjin = (r[9] || 'Hadir').replace(/^"|"$/g, '').trim() as any;
           const keperluan = (r[10] || '').replace(/^"|"$/g, '').trim();
-          const lampiranSurat = ((r[11] || '').toLowerCase().includes('ya') ? 'Ya' : 'Tidak') as any;
+          const rawLampiran = (r[11] || '').trim();
+          const lampiranSurat = rawLampiran.toLowerCase().includes('form')
+            ? 'Form Izin Perusahaan'
+            : rawLampiran.toLowerCase().includes('ya')
+            ? 'Ya'
+            : 'Tidak';
           const catatan = (r[12] || '').replace(/^"|"$/g, '').trim();
 
           const parsedDt = parseDateFlexible(rawTgl);

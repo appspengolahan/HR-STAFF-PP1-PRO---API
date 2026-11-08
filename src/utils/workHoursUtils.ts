@@ -165,7 +165,9 @@ export function calculateEffectivePermitMinutes(
     cleanJenis === 'Cuti' ||
     cleanJenis === 'Cuti Tahunan' ||
     cleanJenis === 'Hadir' ||
-    cleanLampiran === 'ya';
+    cleanLampiran === 'ya' ||
+    cleanLampiran === 'form izin perusahaan' ||
+    cleanLampiran.includes('form izin');
 
   // Ijin yang secara regulasi otomatis berdurasi sehari penuh
   const autoFull =

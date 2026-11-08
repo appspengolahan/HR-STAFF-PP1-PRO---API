@@ -102,7 +102,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   const [formJamAwal, setFormJamAwal] = useState('08:00');
   const [formJamAkhir, setFormJamAkhir] = useState('10:00');
   const [formKeperluan, setFormKeperluan] = useState('');
-  const [formLampiran, setFormLampiran] = useState<'Ya' | 'Tidak'>('Tidak');
+  const [formLampiran, setFormLampiran] = useState<'Ya' | 'Tidak' | 'Form Izin Perusahaan' | string>('Tidak');
   const [formCatatan, setFormCatatan] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -323,7 +323,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   const [editDurasiMenit, setEditDurasiMenit] = useState(120);
   const [editFaktorPotongan, setEditFaktorPotongan] = useState(0);
   const [editKeperluan, setEditKeperluan] = useState('');
-  const [editLampiranSurat, setEditLampiranSurat] = useState<'Ya' | 'Tidak'>('Tidak');
+  const [editLampiranSurat, setEditLampiranSurat] = useState<'Ya' | 'Tidak' | 'Form Izin Perusahaan' | string>('Tidak');
   const [editCatatan, setEditCatatan] = useState('');
 
   // Helper hitung selisih jam ke durasi menit secara akurat
@@ -955,8 +955,20 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                             : `${row.faktorPotongan} (${Math.round(row.faktorPotongan * 100)}% Hari)`}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-slate-600 dark:text-slate-300 max-w-xs truncate">
-                        {row.keperluan || '-'}
+                      <td className="py-3 px-4 text-slate-600 dark:text-slate-300 max-w-xs">
+                        <div className="truncate" title={row.keperluan || '-'}>
+                          {row.keperluan || '-'}
+                        </div>
+                        {row.lampiranSurat === 'Form Izin Perusahaan' && (
+                          <span className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                            Form Izin Perusahaan
+                          </span>
+                        )}
+                        {row.lampiranSurat === 'Ya' && (
+                          <span className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            Surat Resmi
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right no-print print:hidden">
                         <div className="flex items-center justify-end gap-1.5">
@@ -1363,11 +1375,12 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                   <label className="block font-semibold mb-1">Lampiran Surat Resmi</label>
                   <select
                     value={formLampiran}
-                    onChange={(e) => setFormLampiran(e.target.value as 'Ya' | 'Tidak')}
+                    onChange={(e) => setFormLampiran(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg text-xs"
                   >
                     <option value="Tidak">Tidak</option>
-                    <option value="Ya">Ya (Surat Dokter / Tugas)</option>
+                    <option value="Ya">Ya (Surat Dokter / Tugas Resmi)</option>
+                    <option value="Form Izin Perusahaan">Form Izin Perusahaan</option>
                   </select>
                 </div>
                 <div>
@@ -1668,7 +1681,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                   <select
                     value={editLampiranSurat}
                     onChange={(e) => {
-                      const l = e.target.value as 'Ya' | 'Tidak';
+                      const l = e.target.value;
                       setEditLampiranSurat(l);
                       setEditFaktorPotongan(computeFaktor(editJenisIjin, editDurasiMenit, l));
                     }}
@@ -1676,6 +1689,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                   >
                     <option value="Tidak">Tidak Ada Lampiran</option>
                     <option value="Ya">Ada Lampiran (Surat Dokter / Undangan)</option>
+                    <option value="Form Izin Perusahaan">Form Izin Perusahaan</option>
                   </select>
                 </div>
                 <div>

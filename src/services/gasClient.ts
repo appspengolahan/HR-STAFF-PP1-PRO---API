@@ -147,8 +147,12 @@ export const gasClient = {
       }
 
       const jenisIjin = (r.jenisIjin || 'Hadir') as JenisIjin;
-      const lampiranSurat =
-        (r.lampiranSurat || r.lampiran || 'Tidak') === 'Ya' ? 'Ya' : 'Tidak';
+      const rawLampiran = String(r.lampiranSurat || r.lampiran || 'Tidak').trim();
+      const lampiranSurat = rawLampiran.toLowerCase().includes('form')
+        ? 'Form Izin Perusahaan'
+        : rawLampiran.toLowerCase() === 'ya'
+        ? 'Ya'
+        : 'Tidak';
 
       const parsedFaktor = Number(r.faktorPotongan);
       const faktorPotongan = getEffectiveFaktorPotongan({

@@ -235,6 +235,8 @@ export function getEffectiveFaktorPotongan(p: {
     jenis === 'Sakit (S Dokter)' ||
     jenis === 'Hadir' ||
     lampiran === 'ya' ||
+    lampiran === 'form izin perusahaan' ||
+    lampiran.includes('form izin') ||
     catatan.includes('surat dokter') ||
     jenis === 'Cuti' ||
     jenis === 'Cuti Tahunan' ||

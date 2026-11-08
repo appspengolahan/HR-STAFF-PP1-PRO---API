@@ -80,7 +80,7 @@ export interface PresensiRecord {
   jenisIjin: JenisIjin;
   faktorPotongan: number; // 0, 0.5, 1
   keperluan?: string;
-  lampiranSurat: 'Ya' | 'Tidak';
+  lampiranSurat: 'Ya' | 'Tidak' | 'Form Izin Perusahaan' | string;
   catatan?: string;
   bulan: number;
   tahun: number;
