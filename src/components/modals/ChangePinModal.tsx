@@ -38,6 +38,8 @@ export const ChangePinModal: React.FC<ChangePinModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const [confirmResetMode, setConfirmResetMode] = useState(false);
+
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -49,12 +51,13 @@ export const ChangePinModal: React.FC<ChangePinModalProps> = ({
       setShowOldPin(false);
       setShowNewPin(false);
       setShowConfirmPin(false);
+      setConfirmResetMode(false);
     }
   }, [isOpen]);
 
   if (!isOpen || !currentUser) return null;
 
-  const staffNip = currentUser.nip || 'BK-PP1-001';
+  const staffNip = (currentUser.nip || '').trim().toUpperCase() || 'BK-PP1-001';
   const hasCustomPin = storageService.hasStaffCustomPin(staffNip);
   const currentSavedPin = storageService.getStaffPin(staffNip);
 
@@ -93,9 +96,9 @@ export const ChangePinModal: React.FC<ChangePinModalProps> = ({
       return;
     }
 
-    // Simpan PIN baru ke storage
+    // Simpan PIN baru ke storage dengan multi-layer persistence
     storageService.setStaffPin(staffNip, trimmedNew);
-    setSuccessMessage('PIN Keamanan Akun Anda berhasil diperbarui!');
+    setSuccessMessage('PIN Keamanan Akun Anda berhasil diperbarui dan tersimpan permanen!');
 
     if (onSuccess) {
       onSuccess(trimmedNew);
@@ -108,13 +111,15 @@ export const ChangePinModal: React.FC<ChangePinModalProps> = ({
   };
 
   const handleResetToDefault = () => {
-    if (confirm('Kembalikan PIN staf ini ke PIN standar pabrik (123456)?')) {
-      storageService.setStaffPin(staffNip, DEFAULT_STAFF_PIN);
-      setSuccessMessage(`PIN berhasil di-reset kembali ke PIN Standar (${DEFAULT_STAFF_PIN})!`);
-      setTimeout(() => {
-        onClose();
-      }, 1500);
+    storageService.setStaffPin(staffNip, DEFAULT_STAFF_PIN);
+    setSuccessMessage(`PIN berhasil di-reset kembali ke PIN Standar (${DEFAULT_STAFF_PIN})!`);
+    setConfirmResetMode(false);
+    if (onSuccess) {
+      onSuccess(DEFAULT_STAFF_PIN);
     }
+    setTimeout(() => {
+      onClose();
+    }, 1500);
   };
 
   return (
@@ -274,16 +279,36 @@ export const ChangePinModal: React.FC<ChangePinModalProps> = ({
 
           {/* Action buttons */}
           <div className="flex items-center gap-2 pt-2">
-            {hasCustomPin && (
+            {hasCustomPin && !confirmResetMode && (
               <button
                 type="button"
-                onClick={handleResetToDefault}
+                onClick={() => setConfirmResetMode(true)}
                 className="py-2.5 px-3 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 title="Reset kembali ke default 123456"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 Reset Default
               </button>
+            )}
+
+            {confirmResetMode && (
+              <div className="flex items-center gap-1.5 p-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-[11px]">
+                <span className="text-amber-800 dark:text-amber-300 font-medium px-1">Reset 123456?</span>
+                <button
+                  type="button"
+                  onClick={handleResetToDefault}
+                  className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-[10px] cursor-pointer"
+                >
+                  Ya
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmResetMode(false)}
+                  className="px-2 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-[10px] cursor-pointer"
+                >
+                  Batal
+                </button>
+              </div>
             )}
 
             <button

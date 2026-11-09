@@ -1167,6 +1167,10 @@ export default function App() {
         isOpen={isChangePinModalOpen}
         onClose={() => setIsChangePinModalOpen(false)}
         currentUser={currentUser}
+        onSuccess={(pin) => {
+          setSyncToastMessage(`PIN Keamanan Akun staf (${currentUser?.nama}) berhasil disimpan permanen.`);
+          setTimeout(() => setSyncToastMessage(null), 4000);
+        }}
       />
 
       {/* Offline Status Toast */}

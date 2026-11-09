@@ -83,6 +83,16 @@ export const ProfilStaffTab: React.FC<ProfilStaffTabProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Real-time listener for staff PIN changes so badge updates immediately
+  const [, setPinUpdateTick] = useState(0);
+  useEffect(() => {
+    const handlePinChange = () => {
+      setPinUpdateTick((t) => t + 1);
+    };
+    window.addEventListener('bk_staff_pin_changed', handlePinChange);
+    return () => window.removeEventListener('bk_staff_pin_changed', handlePinChange);
+  }, []);
+
   // Filtered staff suggestions
   const suggestions = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();

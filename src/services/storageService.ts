@@ -58,6 +58,7 @@ const KEYS = {
   COLUMN_SETTINGS: 'bk_hr_column_settings_v4',
   BRANDING: 'bk_hr_app_branding_v3',
   STAFF_PINS: 'bk_hr_staff_pins_v3',
+  STAFF_PINS_BACKUP: 'bk_hr_staff_pins_permanent_backup',
 };
 
 export const DEFAULT_STAFF_PIN = '123456';
@@ -737,38 +738,80 @@ export const storageService = {
 
   // Staff PIN Authentication (Portal Mandiri Staf 3-Factor Login)
   getStaffPins(): Record<string, string> {
-    const pins = readStorage<Record<string, string>>(KEYS.STAFF_PINS, {});
+    let pins = readStorage<Record<string, string>>(KEYS.STAFF_PINS, {});
+    // Fail-safe: jika primary key kosong, cek permanent backup & legacy keys
     if (Object.keys(pins).length === 0 && typeof window !== 'undefined' && window.localStorage) {
       try {
+        const backupVal = localStorage.getItem(KEYS.STAFF_PINS_BACKUP);
+        if (backupVal) {
+          const parsed = JSON.parse(backupVal);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            pins = parsed;
+            writeStorage(KEYS.STAFF_PINS, pins);
+            return pins;
+          }
+        }
+        // Fallback ke legacy keys jika ada
+        const v2 = localStorage.getItem('bk_hr_staff_pins_v2');
         const v1 = localStorage.getItem('bk_hr_staff_pins_v1');
-        if (v1) {
-          const parsed = JSON.parse(v1);
-          if (parsed && typeof parsed === 'object') {
-            writeStorage(KEYS.STAFF_PINS, parsed);
-            return parsed;
+        const legacyVal = v2 || v1;
+        if (legacyVal) {
+          const parsed = JSON.parse(legacyVal);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            pins = parsed;
+            writeStorage(KEYS.STAFF_PINS, pins);
+            writeStorage(KEYS.STAFF_PINS_BACKUP, pins);
+            return pins;
           }
         }
       } catch (e) {
-        // Ignore fallback error
+        // Ignore fallback reading error
       }
     }
     return pins;
   },
+
   getStaffPin(nip: string): string {
+    if (!nip) return DEFAULT_STAFF_PIN;
+    const cleanNip = nip.trim();
+    const upperNip = cleanNip.toUpperCase();
+    const lowerNip = cleanNip.toLowerCase();
     const pins = this.getStaffPins();
-    return pins[nip] || DEFAULT_STAFF_PIN;
-  },
-  setStaffPin(nip: string, newPin: string): void {
-    const pins = this.getStaffPins();
-    pins[nip] = newPin.trim();
-    writeStorage(KEYS.STAFF_PINS, pins);
-  },
-  hasStaffCustomPin(nip: string): boolean {
-    const pins = this.getStaffPins();
-    return !!pins[nip];
+    return pins[upperNip] || pins[cleanNip] || pins[lowerNip] || DEFAULT_STAFF_PIN;
   },
 
-  // Reset to initial demo data
+  setStaffPin(nip: string, newPin: string): void {
+    if (!nip) return;
+    const cleanNip = nip.trim();
+    const upperNip = cleanNip.toUpperCase();
+    const cleanPin = (newPin || '').trim();
+    const pins = this.getStaffPins();
+
+    // Simpan baik dengan NIP huruf kapital maupun format asli agar selalu cocok
+    pins[upperNip] = cleanPin;
+    pins[cleanNip] = cleanPin;
+
+    // Simpan ganda ke primary key dan permanent backup key
+    writeStorage(KEYS.STAFF_PINS, pins);
+    writeStorage(KEYS.STAFF_PINS_BACKUP, pins);
+
+    // Kirim event update agar semua tab/komponen langsung merefleksikan perubahan
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('bk_staff_pin_changed', {
+          detail: { nip: upperNip, pin: cleanPin },
+        })
+      );
+    }
+  },
+
+  hasStaffCustomPin(nip: string): boolean {
+    if (!nip) return false;
+    const savedPin = this.getStaffPin(nip);
+    return Boolean(savedPin && savedPin !== DEFAULT_STAFF_PIN);
+  },
+
+  // Reset to initial demo data (PENTING: PIN staf dan branding tetap dilindungi/dipertahankan)
   resetAllData(): void {
     localStorage.removeItem(KEYS.STAFF);
     localStorage.removeItem(KEYS.PRESENSI);
@@ -779,7 +822,8 @@ export const storageService = {
     localStorage.removeItem(KEYS.LINKS);
     localStorage.removeItem(KEYS.KPI);
     localStorage.removeItem(KEYS.ARCHIVE);
-    localStorage.removeItem(KEYS.STAFF_PINS);
+    // CATATAN: KEYS.STAFF_PINS dan KEYS.STAFF_PINS_BACKUP TIDAK DIHAPUS
+    // agar PIN hasil pergantian mandiri oleh staf tidak pernah hilang kembali ke 123456
     window.location.reload();
   },
 };

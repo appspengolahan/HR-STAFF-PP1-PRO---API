@@ -235,7 +235,7 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
       return;
     }
 
-    const correctPin = storageService.getStaffPin(matched.nip);
+    const correctPin = storageService.getStaffPin(matched.nip).trim();
     if (inputPin !== correctPin) {
       setStaffError(
         'AKSES DITOLAK: PIN Keamanan salah! Gunakan PIN standar (123456) jika belum pernah diubah, atau masukkan PIN baru yang telah Anda atur.'
