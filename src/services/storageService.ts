@@ -11,6 +11,7 @@ import {
   StaffData,
   DeletedArchiveRecord,
   UserRole,
+  RolePermission,
   AppBrandingSettings,
 } from '../types';
 import {
@@ -59,17 +60,77 @@ const KEYS = {
   BRANDING: 'bk_hr_app_branding_v3',
   STAFF_PINS: 'bk_hr_staff_pins_v3',
   STAFF_PINS_BACKUP: 'bk_hr_staff_pins_permanent_backup',
+  ROLES: 'bk_hr_custom_roles_v3',
 };
 
 export const DEFAULT_STAFF_PIN = '123456';
 
-// Cleanup old obsolete v1 and v2 keys (PENTING: Jangan hapus staff_pins atau branding)
+export const DEFAULT_ROLE_PERMISSIONS: RolePermission[] = [
+  {
+    id: 'role-dev',
+    role: 'Lead Developer',
+    desc: 'Super User: Konfigurasi sistem, debugging REST GAS, & override data',
+    defaultTabs: ['dashboard', 'presensi', 'lembur', 'rekap', 'slip', 'cuti', 'kpi', 'database', 'mutasi', 'pelatihan', 'profil', 'hakakses', 'pengaturan'],
+    userCount: 1,
+    isSystem: true,
+  },
+  {
+    id: 'role-pm',
+    role: 'Project Manager',
+    desc: 'Lalu Mahendra Ali Akbar: Kontrol operasional PP1 penuh & approval',
+    defaultTabs: ['dashboard', 'presensi', 'lembur', 'rekap', 'slip', 'cuti', 'kpi', 'database', 'mutasi', 'pelatihan', 'profil', 'hakakses', 'pengaturan'],
+    userCount: 1,
+    isSystem: true,
+  },
+  {
+    id: 'role-site',
+    role: 'Site Engineer',
+    desc: 'Andhik Dharmabakti: Monitoring OEE mesin, presensi shift, & lembur',
+    defaultTabs: ['dashboard', 'presensi', 'lembur', 'kpi', 'database', 'profil', 'pengaturan'],
+    userCount: 2,
+    isSystem: true,
+  },
+  {
+    id: 'role-hr',
+    role: 'Admin HR',
+    desc: 'Personalia: Presensi harian, berkas izin, PKWT & database staf',
+    defaultTabs: ['dashboard', 'presensi', 'lembur', 'rekap', 'cuti', 'database', 'mutasi', 'pelatihan', 'profil', 'pengaturan'],
+    userCount: 2,
+    isSystem: true,
+  },
+  {
+    id: 'role-finance',
+    role: 'Finance',
+    desc: 'Keuangan & Pajak: Slip gaji, perhitungan PPh21 TER, & BPJS',
+    defaultTabs: ['dashboard', 'slip', 'rekap', 'database', 'profil', 'pengaturan'],
+    userCount: 2,
+    isSystem: true,
+  },
+  {
+    id: 'role-dept',
+    role: 'Kepala Dept',
+    desc: 'Supervisi Departemen: Approval cuti & matriks KPI bulanan',
+    defaultTabs: ['dashboard', 'presensi', 'lembur', 'cuti', 'kpi', 'profil'],
+    userCount: 4,
+    isSystem: true,
+  },
+  {
+    id: 'role-staff',
+    role: 'Staf',
+    desc: 'Portal Mandiri Karyawan: Akses terisolasi slip gaji & profil pribadi',
+    defaultTabs: ['slip', 'presensi', 'cuti', 'profil'],
+    userCount: 24,
+    isSystem: true,
+  },
+];
+
+// Cleanup old obsolete v1 and v2 keys (PENTING: Jangan hapus staff_pins, branding, atau custom_roles)
 if (typeof window !== 'undefined' && window.localStorage) {
   try {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
-      if (k && (k.includes('staff_pins') || k.includes('branding'))) {
-        continue; // Lindungi PIN staf dan branding agar tidak terhapus saat refresh
+      if (k && (k.includes('staff_pins') || k.includes('branding') || k.includes('custom_roles'))) {
+        continue; // Lindungi PIN staf, branding, dan custom roles agar tidak terhapus saat refresh
       }
       if (k && k.startsWith('bk_hr_') && (k.endsWith('_v1') || k.endsWith('_v2') || k.endsWith('_mock'))) {
         localStorage.removeItem(k);
@@ -809,6 +870,23 @@ export const storageService = {
     if (!nip) return false;
     const savedPin = this.getStaffPin(nip);
     return Boolean(savedPin && savedPin !== DEFAULT_STAFF_PIN);
+  },
+
+  // Custom RBAC Role Permissions
+  getCustomRoles(): RolePermission[] {
+    const list = readStorage<RolePermission[]>(KEYS.ROLES, DEFAULT_ROLE_PERMISSIONS);
+    if (!list || list.length === 0) {
+      writeStorage(KEYS.ROLES, DEFAULT_ROLE_PERMISSIONS);
+      return DEFAULT_ROLE_PERMISSIONS;
+    }
+    return list;
+  },
+  saveCustomRoles(roles: RolePermission[]): void {
+    writeStorage(KEYS.ROLES, roles);
+  },
+  resetCustomRoles(): RolePermission[] {
+    writeStorage(KEYS.ROLES, DEFAULT_ROLE_PERMISSIONS);
+    return DEFAULT_ROLE_PERMISSIONS;
   },
 
   // Reset to initial demo data (PENTING: PIN staf dan branding tetap dilindungi/dipertahankan)

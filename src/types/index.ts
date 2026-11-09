@@ -5,7 +5,17 @@ export type UserRole =
   | 'Admin HR'
   | 'Finance'
   | 'Kepala Dept'
-  | 'Staf';
+  | 'Staf'
+  | (string & {});
+
+export interface RolePermission {
+  id: string;
+  role: string;
+  desc: string;
+  defaultTabs: string[];
+  userCount: number;
+  isSystem?: boolean;
+}
 
 export type PortalType = 'management' | 'staff';
 
