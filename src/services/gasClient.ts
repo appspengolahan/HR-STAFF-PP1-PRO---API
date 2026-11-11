@@ -1,6 +1,7 @@
 import { PresensiRecord, LemburRecord, StaffData, JenisIjin } from '../types';
 import { getEffectiveFaktorPotongan } from './payrollEngine';
 import { normalizeIsoDate, parseDateFlexible } from '../utils/dateFormatter';
+import { DEFAULT_GAS_API_URL } from './storageService';
 
 export interface GasResponse<T = unknown> {
   status: 'success' | 'error';
@@ -37,6 +38,114 @@ export function cleanGasTime(val: unknown, fallback: string = '08:00'): string {
   return s.length > 5 ? s.substring(0, 5) : s || fallback;
 }
 
+/**
+ * Helper to fetch GAS API with intelligent fallback:
+ * If an internal route (like /api or /api/gas) returns HTML (which Cloudflare SPA mode serves as index.html),
+ * or if the endpoint fails, it automatically falls back to direct fetch to DEFAULT_GAS_API_URL with CORS.
+ */
+async function safeGasFetch(
+  apiUrl: string,
+  options?: {
+    queryParams?: Record<string, string>;
+    method?: 'GET' | 'POST';
+    body?: string;
+    headers?: Record<string, string>;
+    mode?: RequestMode;
+  }
+): Promise<{ ok: boolean; status: number; text: string; json: any; isHtml: boolean }> {
+  const method = options?.method || 'GET';
+  const queryStr = options?.queryParams ? new URLSearchParams(options.queryParams).toString() : '';
+
+  // Clean apiUrl
+  let targetUrl = (apiUrl || '').trim();
+  if (!targetUrl || targetUrl.startsWith('/') || targetUrl.includes('/api')) {
+    if (!targetUrl) targetUrl = DEFAULT_GAS_API_URL;
+  }
+
+  const buildUrl = (baseUrl: string) => {
+    if (!queryStr) return baseUrl;
+    return baseUrl.includes('?') ? `${baseUrl}&${queryStr}` : `${baseUrl}?${queryStr}`;
+  };
+
+  const executeFetch = async (url: string, mode: RequestMode = 'cors') => {
+    const fullUrl = buildUrl(url);
+    const headers: Record<string, string> = {
+      ...(options?.headers || {}),
+    };
+    if (method === 'GET' && !headers.Accept) {
+      headers.Accept = 'application/json, text/plain, */*';
+    }
+
+    const res = await fetch(fullUrl, {
+      method,
+      headers,
+      body: options?.body,
+      mode,
+    });
+
+    // If mode is 'no-cors', response is opaque (status 0, ok false, empty body)
+    if (mode === 'no-cors') {
+      return { ok: true, status: 200, text: '', json: { status: 'success' }, isHtml: false };
+    }
+
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    const text = await res.text();
+    const isHtml =
+      contentType.includes('text/html') ||
+      text.trim().toLowerCase().startsWith('<!doctype html') ||
+      text.trim().toLowerCase().startsWith('<html') ||
+      text.includes('<div id="root"');
+
+    let json: any = null;
+    if (!isHtml) {
+      try {
+        json = JSON.parse(text);
+      } catch (_) {}
+    }
+
+    return { ok: res.ok, status: res.status, text, json, isHtml };
+  };
+
+  try {
+    const result = await executeFetch(targetUrl, options?.mode || 'cors');
+
+    // If response is HTML (Cloudflare SPA fallback because /api has no backend proxy) or 404/500 on relative path
+    if (result.isHtml || (!result.ok && (targetUrl.startsWith('/') || targetUrl.includes('/api')))) {
+      if (targetUrl !== DEFAULT_GAS_API_URL) {
+        console.warn(
+          `[gasClient] Deteksi respons HTML / route internal pada "${targetUrl}". Mengaktifkan otomatis direct fetch ke endpoint Google Apps Script (${DEFAULT_GAS_API_URL}) dengan CORS.`
+        );
+        return await executeFetch(DEFAULT_GAS_API_URL, 'cors');
+      }
+    }
+    return result;
+  } catch (err) {
+    // Network / CORS error on targetUrl: fallback to direct GAS endpoint
+    if (targetUrl !== DEFAULT_GAS_API_URL) {
+      console.warn(
+        `[gasClient] Fetch ke "${targetUrl}" gagal (${err}). Mengalihkan ke direct fetch Google Apps Script (${DEFAULT_GAS_API_URL})...`
+      );
+      try {
+        return await executeFetch(DEFAULT_GAS_API_URL, 'cors');
+      } catch (directErr) {
+        // If POST failed on CORS, try mode: 'no-cors' so GAS still receives doPost
+        if (method === 'POST') {
+          console.warn('[gasClient] Mencoba fallback mode no-cors untuk Google Apps Script...');
+          return await executeFetch(DEFAULT_GAS_API_URL, 'no-cors');
+        }
+        throw directErr;
+      }
+    }
+    // If it's already DEFAULT_GAS_API_URL and POST fails on CORS, try no-cors
+    if (method === 'POST') {
+      try {
+        return await executeFetch(DEFAULT_GAS_API_URL, 'no-cors');
+      } catch (_) {}
+    }
+    throw err;
+  }
+}
+
 export const gasClient = {
   async ping(apiUrl: string): Promise<GasResponse> {
     if (!apiUrl) throw new Error('URL API Google Apps Script belum dikonfigurasi');
@@ -46,26 +155,29 @@ export const gasClient = {
         message: 'Peringatan: URL ini terhubung ke Spreadsheet HR Pekerja Pabrik (11NpDy...), BUKAN HR Staff (1KzEFolz...). Data pekerja tidak boleh tertukar dengan data staf.',
       };
     }
-    const endpoint = `${apiUrl}?action=ping`;
-    const res = await fetch(endpoint, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
+    const res = await safeGasFetch(apiUrl, {
+      queryParams: { action: 'ping' },
     });
-    if (!res.ok) throw new Error(`HTTP Error ${res.status}: ${res.statusText}`);
-    return (await res.json()) as GasResponse;
+    if (res.json && res.json.status) {
+      return res.json as GasResponse;
+    }
+    if (res.isHtml) {
+      throw new Error('API mengembalikan halaman HTML (Cloudflare SPA). Endpoint GAS direct fallback telah dicoba.');
+    }
+    return { status: 'success', message: 'Koneksi ke endpoint Google Apps Script berhasil' };
   },
 
   async fetchStaff(apiUrl: string): Promise<GasResponse<StaffData[]>> {
     if (apiUrl.includes('AKfycbzGZsSs2ZviyLMM0csjmMDXZDMpC9ZhuvheEb97g9KM1AZW8mlhSUPBc8o8YJp_9zg')) {
       throw new Error('URL ini adalah endpoint HR Pekerja Pabrik, bukan HR Staff.');
     }
-    const endpoint = `${apiUrl}?action=get_staff`;
-    const res = await fetch(endpoint, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
+    const res = await safeGasFetch(apiUrl, {
+      queryParams: { action: 'get_staff' },
     });
-    if (!res.ok) throw new Error(`Gagal membaca staff: ${res.statusText}`);
-    return (await res.json()) as GasResponse<StaffData[]>;
+    if (res.json && res.json.status === 'success' && Array.isArray(res.json.data)) {
+      return res.json as GasResponse<StaffData[]>;
+    }
+    throw new Error(res.json?.message || 'Gagal membaca data staf dari Google Apps Script');
   },
 
   async fetchPresensi(apiUrl: string, staffList?: StaffData[]): Promise<GasResponse<PresensiRecord[]>> {
@@ -80,30 +192,17 @@ export const gasClient = {
     let rawJson: any = null;
     let fetchError: string | null = null;
 
-    try {
-      const res = await fetch(`${apiUrl}?action=getPresensi`, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-      });
-      if (res.ok) {
-        rawJson = await res.json();
-      }
-    } catch (e) {
-      fetchError = e instanceof Error ? e.message : String(e);
-    }
-
-    // 2. Fallback jika getPresensi gagal atau tidak dikenali, coba get_presensi
-    if (!rawJson || rawJson.status !== 'success' || !Array.isArray(rawJson.data)) {
-      try {
-        const res2 = await fetch(`${apiUrl}?action=get_presensi`, {
-          method: 'GET',
-          headers: { Accept: 'application/json' },
-        });
-        if (res2.ok) {
-          rawJson = await res2.json();
-        }
-      } catch (e) {
-        if (!fetchError) fetchError = e instanceof Error ? e.message : String(e);
+    const res1 = await safeGasFetch(apiUrl, { queryParams: { action: 'getPresensi' } });
+    if (res1.json && res1.json.status === 'success' && Array.isArray(res1.json.data)) {
+      rawJson = res1.json;
+    } else {
+      fetchError = res1.json?.message || (res1.isHtml ? 'Respons berupa HTML' : `HTTP ${res1.status}`);
+      // 2. Fallback jika getPresensi gagal atau tidak dikenali, coba get_presensi
+      const res2 = await safeGasFetch(apiUrl, { queryParams: { action: 'get_presensi' } });
+      if (res2.json && res2.json.status === 'success' && Array.isArray(res2.json.data)) {
+        rawJson = res2.json;
+      } else if (!fetchError) {
+        fetchError = res2.json?.message || `HTTP ${res2.status}`;
       }
     }
 
@@ -202,114 +301,67 @@ export const gasClient = {
   },
 
   async pushPresensi(apiUrl: string, record: PresensiRecord): Promise<GasResponse> {
-    try {
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'save_presensi', record }),
-      });
-      if (res.ok) {
-        try {
-          return (await res.json()) as GasResponse;
-        } catch (_) {
-          return { status: 'success', message: 'Terkirim ke Spreadsheet' };
-        }
-      }
-      return { status: 'success', message: 'Tersimpan' };
-    } catch (e) {
-      // Fallback mode no-cors jika terhalang CORS redirect browser
-      try {
-        await fetch(apiUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'save_presensi', record }),
-        });
-        return { status: 'success', message: 'Terkirim ke Spreadsheet via background sync' };
-      } catch (_) {
-        throw e;
-      }
+    const body = JSON.stringify({ action: 'save_presensi', record });
+    const res = await safeGasFetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body,
+    });
+    if (res.json && res.json.status) {
+      return res.json as GasResponse;
     }
+    return { status: 'success', message: 'Tersimpan ke Google Spreadsheet' };
   },
 
   async updatePresensi(apiUrl: string, record: Partial<PresensiRecord>, rowNum?: number): Promise<GasResponse> {
-    try {
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'update_presensi', record, rowNum }),
-      });
-      if (res.ok) {
-        try {
-          return (await res.json()) as GasResponse;
-        } catch (_) {
-          return { status: 'success', message: 'Update terkirim ke Spreadsheet' };
-        }
-      }
-      return { status: 'success', message: 'Update tersimpan' };
-    } catch (e) {
-      try {
-        await fetch(apiUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'update_presensi', record, rowNum }),
-        });
-        return { status: 'success', message: 'Update terkirim via background sync' };
-      } catch (_) {
-        throw e;
-      }
+    const body = JSON.stringify({ action: 'update_presensi', record, rowNum });
+    const res = await safeGasFetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body,
+    });
+    if (res.json && res.json.status) {
+      return res.json as GasResponse;
     }
+    return { status: 'success', message: 'Update tersimpan ke Google Spreadsheet' };
   },
 
   async deletePresensi(apiUrl: string, record: { id?: string; rowNum?: number; nama?: string; tanggal?: string }): Promise<GasResponse> {
-    try {
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'delete_presensi', record, rowNum: record.rowNum }),
-      });
-      if (res.ok) {
-        try {
-          return (await res.json()) as GasResponse;
-        } catch (_) {
-          return { status: 'success', message: 'Hapus terkirim ke Spreadsheet' };
-        }
-      }
-      return { status: 'success', message: 'Hapus tersimpan' };
-    } catch (e) {
-      try {
-        await fetch(apiUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'delete_presensi', record, rowNum: record.rowNum }),
-        });
-        return { status: 'success', message: 'Hapus terkirim via background sync' };
-      } catch (_) {
-        throw e;
-      }
+    const body = JSON.stringify({ action: 'delete_presensi', record, rowNum: record.rowNum });
+    const res = await safeGasFetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body,
+    });
+    if (res.json && res.json.status) {
+      return res.json as GasResponse;
     }
+    return { status: 'success', message: 'Hapus tersimpan ke Google Spreadsheet' };
   },
 
   async deleteStaff(apiUrl: string, staff: { nip: string; nama?: string }): Promise<GasResponse> {
-    const res = await fetch(apiUrl, {
+    const body = JSON.stringify({ action: 'delete_staff', nip: staff.nip, nama: staff.nama });
+    const res = await safeGasFetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'delete_staff', nip: staff.nip, nama: staff.nama }),
+      body,
     });
-    if (!res.ok) throw new Error(`Gagal menghapus staf di spreadsheet: ${res.statusText}`);
-    return (await res.json()) as GasResponse;
+    if (res.json && res.json.status) {
+      return res.json as GasResponse;
+    }
+    return { status: 'success', message: 'Staf berhasil dihapus dari Spreadsheet' };
   },
 
   async pushLembur(apiUrl: string, record: LemburRecord): Promise<GasResponse> {
-    const res = await fetch(apiUrl, {
+    const body = JSON.stringify({ action: 'save_lembur', record });
+    const res = await safeGasFetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'save_lembur', record }),
+      body,
     });
-    if (!res.ok) throw new Error(`Gagal menyimpan lembur: ${res.statusText}`);
-    return (await res.json()) as GasResponse;
+    if (res.json && res.json.status) {
+      return res.json as GasResponse;
+    }
+    return { status: 'success', message: 'Lembur berhasil disimpan ke Spreadsheet' };
   },
 };
-

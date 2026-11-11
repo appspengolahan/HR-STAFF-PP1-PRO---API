@@ -25,10 +25,13 @@ export const JadwalMutasiTab: React.FC<JadwalMutasiTabProps> = ({
   onApplyDueMutations,
 }) => {
   const [filterStatus, setFilterStatus] = useState<string>('Semua');
+  // Filter tanggal mutasi default '' (transaksi terkini) agar tabel tidak kosong saat pertama kali dibuka
+  const [filterTanggal, setFilterTanggal] = useState<string>('');
 
   const filtered = mutasiList.filter((m) => {
-    if (filterStatus === 'Semua') return true;
-    return m.status === filterStatus;
+    if (filterStatus !== 'Semua' && m.status !== filterStatus) return false;
+    if (filterTanggal && !m.tanggalEfektif.startsWith(filterTanggal)) return false;
+    return true;
   });
 
   const handleExportPdf = () => {
@@ -53,22 +56,51 @@ export const JadwalMutasiTab: React.FC<JadwalMutasiTabProps> = ({
       {/* Main Card */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
         {/* Controls */}
-        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 no-print print:hidden bg-slate-50/50 dark:bg-slate-950/30">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500">Filter Status:</span>
-            {['Semua', 'Terjadwal', 'Diterapkan', 'Dibatalkan'].map((st) => (
-              <button
-                key={st}
-                onClick={() => setFilterStatus(st)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                  filterStatus === st
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                }`}
-              >
-                {st}
-              </button>
-            ))}
+        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 no-print print:hidden bg-slate-50/50 dark:bg-slate-950/30">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500">Filter Status:</span>
+              {['Semua', 'Terjadwal', 'Diterapkan', 'Dibatalkan'].map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setFilterStatus(st)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    filterStatus === st
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" /> Tanggal:
+              </span>
+              <input
+                type="date"
+                value={filterTanggal}
+                onChange={(e) => setFilterTanggal(e.target.value)}
+                className="px-2.5 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                title="Filter Tanggal Efektif (Kosong = Transaksi Terkini)"
+              />
+              {filterTanggal ? (
+                <button
+                  type="button"
+                  onClick={() => setFilterTanggal('')}
+                  className="px-2 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg font-medium cursor-pointer"
+                  title="Tampilkan Semua Transaksi Terkini"
+                >
+                  Reset (Terkini)
+                </button>
+              ) : (
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-full font-medium">
+                  Transaksi Terkini
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -109,7 +141,7 @@ export const JadwalMutasiTab: React.FC<JadwalMutasiTabProps> = ({
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-8 text-center text-slate-400">
-                    Tidak ada catatan mutasi dengan status yang dipilih.
+                    Tidak ada catatan mutasi dengan kriteria filter yang dipilih.
                   </td>
                 </tr>
               ) : (
