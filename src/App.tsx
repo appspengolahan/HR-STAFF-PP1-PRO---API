@@ -4,7 +4,7 @@
  * Developed by Lalu Mahendra
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   AuthUser,
   StaffData,
@@ -205,8 +205,24 @@ export default function App() {
     return saved === 'true'; // Default false
   });
 
+  const staffListRef = useRef<StaffData[]>(staffList);
+  useEffect(() => {
+    staffListRef.current = staffList;
+  }, [staffList]);
+
+  const isSyncInFlightRef = useRef(false);
+  const lastSyncAtRef = useRef(0);
+
   const handleSyncPresensiLive = useCallback(
     async (isSilent = false, forceDatasheet = false) => {
+      const now = Date.now();
+      if (isSyncInFlightRef.current) return;
+      if (isSilent && !forceDatasheet && now - lastSyncAtRef.current < 15000) {
+        return;
+      }
+
+      isSyncInFlightRef.current = true;
+      lastSyncAtRef.current = now;
       try {
         setIsSyncingPresensi(true);
         const shouldPullFromDatasheet = forceDatasheet || isDatasheetSourceActive;
@@ -236,7 +252,7 @@ export default function App() {
           !activeUrl.includes('AKfycbzGZsSs2ZviyLMM0csjmMDXZDMpC9ZhuvheEb97g9KM1AZW8mlhSUPBc8o8YJp_9zg');
 
         if (hasValidStaffGasUrl) {
-          const res = await gasClient.fetchPresensi(activeUrl, staffList);
+          const res = await gasClient.fetchPresensi(activeUrl, staffListRef.current);
           if (res.status === 'success' && res.data && res.data.length > 0) {
             storageService.savePresensiList(res.data);
             const mergedPresensi = storageService.getPresensiList();
@@ -272,10 +288,11 @@ export default function App() {
           setTimeout(() => setSyncToastMessage(null), 5000);
         }
       } finally {
+        isSyncInFlightRef.current = false;
         setIsSyncingPresensi(false);
       }
     },
-    [staffList, isDatasheetSourceActive]
+    [isDatasheetSourceActive]
   );
 
   const handleToggleDatasheetSource = () => {
@@ -298,11 +315,13 @@ export default function App() {
     handleSyncPresensiLive(false, true);
   };
 
-  // Auto-sync on app load & when window regains focus
+  // Auto-sync on app load & when window regains focus (cooldown-guarded)
   useEffect(() => {
     handleSyncPresensiLive(true);
     const handleFocus = () => {
-      handleSyncPresensiLive(true);
+      if (document.visibilityState === 'visible') {
+        handleSyncPresensiLive(true);
+      }
     };
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
@@ -826,7 +845,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans">
+    <div className="min-h-[100dvh] bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans overflow-x-hidden">
       {/* Dev Supervisor Floating Bar */}
       <RoleSimulatorBar
         currentUser={currentUser}
@@ -877,7 +896,7 @@ export default function App() {
 
       {/* Main Viewport */}
       <div
-        className={`flex-1 flex flex-col transition-all duration-300 pt-14 pb-24 lg:pb-10 print:pt-0 print:pb-0 print:m-0 print:p-0 ${
+        className={`flex-1 flex flex-col transition-all duration-300 pt-14 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-10 print:pt-0 print:pb-0 print:m-0 print:p-0 ${
           sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-64'
         } print:lg:ml-0`}
       >
@@ -1055,21 +1074,27 @@ export default function App() {
 
       {/* Mobile More Tabs Sheet */}
       {isMobileMoreOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 bg-slate-950/70 backdrop-blur-sm lg:hidden animate-in fade-in duration-200 no-print">
-          <div className="bg-white dark:bg-slate-900 rounded-t-3xl w-full p-6 space-y-4 max-h-[80vh] overflow-y-auto border-t border-slate-200 dark:border-slate-800">
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center p-0 bg-slate-950/70 backdrop-blur-sm lg:hidden animate-in fade-in duration-200 no-print"
+          onClick={() => setIsMobileMoreOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-slate-900 rounded-t-3xl w-full p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] space-y-4 max-h-[85dvh] overflow-y-auto border-t border-slate-200 dark:border-slate-800"
+          >
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <span className="font-bold text-sm text-slate-900 dark:text-white">
                 Menu Modul Lainnya
               </span>
               <button
                 onClick={() => setIsMobileMoreOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-2 gap-2.5 text-xs">
               {[
                 { id: 'dashboard', label: 'Dashboard' },
                 { id: 'presensi', label: 'Presensi & Ijin' },
@@ -1091,7 +1116,7 @@ export default function App() {
                     setActiveTab(m.id);
                     setIsMobileMoreOpen(false);
                   }}
-                  className={`p-3 rounded-xl text-left font-semibold transition-colors ${
+                  className={`min-h-[44px] px-3.5 py-2.5 rounded-xl text-left font-semibold transition-colors ${
                     activeTab === m.id
                       ? 'bg-blue-600 text-white'
                       : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300'

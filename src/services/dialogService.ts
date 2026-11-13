@@ -1,6 +1,6 @@
 /**
  * Dialog Service for Global Centered Popups
- * Replaces native browser alert/confirm (which display domain headers like "hr-staff-pp1-pro-api.vercel.app says")
+ * Replaces native browser alert/confirm (which display domain headers like "hr-staff-pp1.workers.dev says")
  * with custom, centered modal popups displaying "hr staff pp1 says".
  */
 

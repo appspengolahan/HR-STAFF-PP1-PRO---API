@@ -141,11 +141,39 @@ if (typeof window !== 'undefined' && window.localStorage) {
   }
 }
 
+const memoryCache = new Map<string, unknown>();
+let cachedReconciledPresensi: {
+  baseRef: PresensiRecord[];
+  manualRef: PresensiRecord[];
+  result: PresensiRecord[];
+} | null = null;
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key) {
+      memoryCache.delete(e.key);
+      if (e.key === KEYS.PRESENSI || e.key === KEYS.PRESENSI_MANUAL) {
+        cachedReconciledPresensi = null;
+      }
+    } else {
+      memoryCache.clear();
+      cachedReconciledPresensi = null;
+    }
+  });
+}
+
 function readStorage<T>(key: string, fallback: T): T {
+  if (memoryCache.has(key)) {
+    return memoryCache.get(key) as T;
+  }
   try {
     const val = localStorage.getItem(key);
-    if (!val) return fallback;
-    return JSON.parse(val) as T;
+    if (!val) {
+      return fallback;
+    }
+    const parsed = JSON.parse(val) as T;
+    memoryCache.set(key, parsed);
+    return parsed;
   } catch (e) {
     console.warn(`Error reading key ${key} from localStorage:`, e);
     return fallback;
@@ -153,6 +181,10 @@ function readStorage<T>(key: string, fallback: T): T {
 }
 
 function writeStorage<T>(key: string, data: T): void {
+  memoryCache.set(key, data);
+  if (key === KEYS.PRESENSI || key === KEYS.PRESENSI_MANUAL) {
+    cachedReconciledPresensi = null;
+  }
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (e) {
@@ -187,26 +219,25 @@ export const storageService = {
       return st;
     });
 
-    // Sinkronisasi data staf dengan mutasi yang berstatus 'Diterapkan'
+    // Sinkronisasi data staf dengan mutasi yang berstatus 'Diterapkan' secara immutable
     const mutasiList = readStorage<MutasiRecord[]>(KEYS.MUTASI, INITIAL_MUTASI_LIST);
     if (mutasiList && mutasiList.length > 0) {
       mutasiList.forEach((m) => {
         if (m.status === 'Diterapkan') {
           const sIdx = verified.findIndex((s) => s.nip === m.nip);
           if (sIdx !== -1) {
-            const st = verified[sIdx];
+            const st = { ...verified[sIdx] };
+            let stChanged = false;
             if (m.jenisMutasi === 'Status Kepegawaian') {
               if (m.nilaiBaru === 'TETAP' && st.status !== 'TETAP') {
                 st.status = 'TETAP';
                 st.akhirPKWT = 'Tidak berlaku (TETAP)';
-                needsUpdate = true;
+                stChanged = true;
               } else if (m.nilaiBaru.startsWith('PKWT')) {
                 if (st.status !== m.nilaiBaru) {
                   st.status = m.nilaiBaru as any;
-                  needsUpdate = true;
+                  stChanged = true;
                 }
-                // Jika akhirPKWT masih tanggal lama yang sudah expired / sama dengan tanggal efektif mutasi
-                // Otomatis perbarui ke 1 tahun berikutnya dari tanggal efektif
                 if (
                   st.akhirPKWT &&
                   (st.akhirPKWT === '30/10/2026' ||
@@ -216,16 +247,20 @@ export const storageService = {
                 ) {
                   st.awalPKWT = '01/11/2026';
                   st.akhirPKWT = '31/10/2027';
-                  needsUpdate = true;
+                  stChanged = true;
                 }
               } else if (m.nilaiBaru.match(/^\d{4}-\d{2}-\d{2}$/) || m.nilaiBaru.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
                 if (st.akhirPKWT !== m.nilaiBaru) {
                   st.akhirPKWT = m.nilaiBaru;
-                  needsUpdate = true;
+                  stChanged = true;
                 }
               }
             } else if (m.jenisMutasi === 'Jabatan' && st.jabatan !== m.nilaiBaru) {
               st.jabatan = m.nilaiBaru;
+              stChanged = true;
+            }
+            if (stChanged) {
+              verified[sIdx] = st;
               needsUpdate = true;
             }
           }
@@ -243,17 +278,16 @@ export const storageService = {
     writeStorage(KEYS.STAFF, list);
   },
   addStaff(staff: StaffData): void {
-    const list = this.getStaffList();
-    list.unshift(staff);
+    const list = [staff, ...this.getStaffList()];
     this.saveStaffList(list);
   },
   updateStaff(nip: string, patch: Partial<StaffData>): void {
-    const list = this.getStaffList();
+    const list = [...this.getStaffList()];
     const idx = list.findIndex((s) => s.nip === nip);
     if (idx !== -1) {
-      list[idx] = { ...list[idx], ...patch };
-      // Recalculate static total gaji
-      list[idx].totalGaji = (list[idx].gajiPokok || 0) + (list[idx].tunjanganJabatan || 0);
+      const updated = { ...list[idx], ...patch };
+      updated.totalGaji = (updated.gajiPokok || 0) + (updated.tunjanganJabatan || 0);
+      list[idx] = updated;
       this.saveStaffList(list);
     }
   },
@@ -287,7 +321,17 @@ export const storageService = {
   },
   getPresensiList(): PresensiRecord[] {
     const list = readStorage<PresensiRecord[]>(KEYS.PRESENSI, INITIAL_PRESENSI_LIST);
-    const manualList = this.getManualPresensiList();
+    const rawManualList = this.getManualPresensiList();
+
+    if (
+      cachedReconciledPresensi &&
+      cachedReconciledPresensi.baseRef === list &&
+      cachedReconciledPresensi.manualRef === rawManualList
+    ) {
+      return cachedReconciledPresensi.result;
+    }
+
+    let manualList = [...rawManualList];
 
     const hasMatsukriOct7 = list && list.some(
       (p) => (p.tanggal === '2026-10-07' || p.tanggal === '07/10/2026') && p.nama.toLowerCase().includes('matsukri')
@@ -303,18 +347,18 @@ export const storageService = {
       (list && list.some((p) => p.nip === 'BK-PP1-017' && (p.tanggal === '2026-10-13' || p.tanggal === '13/10/2026')));
 
     const hasSumiati = list && list.some((p) => p.nama.toUpperCase().includes('SUMIATI'));
-    const baseList = (!list || list.length < 358 || !hasMatsukriOct7 || hasSumiati)
+    let baseList = (!list || list.length < 358 || !hasMatsukriOct7 || hasSumiati)
       ? INITIAL_PRESENSI_LIST
       : list;
 
-    // Pastikan jika ada data Dedik Anwar dari INITIAL_PRESENSI_LIST yang belum tersimpan di local storage pengguna, otomatis disertakan ke manualList
+    let manualDirty = false;
     if (!hasDedikOct9) {
       const dedikRec = INITIAL_PRESENSI_LIST.find(
         (p) => p.nip === 'BK-PP1-017' && p.tanggal === '2026-10-09'
       );
       if (dedikRec && !manualList.some((m) => m.id === dedikRec.id)) {
         manualList.unshift(dedikRec);
-        writeStorage(KEYS.PRESENSI_MANUAL, manualList);
+        manualDirty = true;
       }
     }
     if (!hasDedikOct12) {
@@ -323,7 +367,7 @@ export const storageService = {
       );
       if (dedikRec12 && !manualList.some((m) => m.id === dedikRec12.id)) {
         manualList.unshift(dedikRec12);
-        writeStorage(KEYS.PRESENSI_MANUAL, manualList);
+        manualDirty = true;
       }
     }
     if (!hasDedikOct13) {
@@ -332,11 +376,9 @@ export const storageService = {
       );
       if (dedikRec13 && !manualList.some((m) => m.id === dedikRec13.id)) {
         manualList.unshift(dedikRec13);
-        writeStorage(KEYS.PRESENSI_MANUAL, manualList);
+        manualDirty = true;
       }
     } else {
-      // Perbarui jika data Dedik Anwar tanggal 2026-10-09 masih mencatat waktu lama (08:00 atau durasi 120 atau faktor 0)
-      let manualChanged = false;
       manualList.forEach((m, idx) => {
         if (
           m.nip === 'BK-PP1-017' &&
@@ -351,116 +393,134 @@ export const storageService = {
             jenisIjin: 'Ijin Pulang Awal',
             faktorPotongan: 0.5,
           };
-          manualChanged = true;
+          manualDirty = true;
         }
       });
-      if (manualChanged) {
-        writeStorage(KEYS.PRESENSI_MANUAL, manualList);
-      }
 
       if (list && Array.isArray(list)) {
         let listChanged = false;
-        list.forEach((p, idx) => {
+        const patchedList = list.map((p) => {
           if (
             p.nip === 'BK-PP1-017' &&
             (p.tanggal === '2026-10-09' || p.tanggal === '09/10/2026') &&
             (p.jamAwal === '08:00' || p.durasiMenit === 120 || p.faktorPotongan === 0)
           ) {
-            list[idx] = {
+            listChanged = true;
+            return {
               ...p,
               jamAwal: '14:00',
               jamAkhir: '16:30',
               durasiMenit: 150,
-              jenisIjin: 'Ijin Pulang Awal',
+              jenisIjin: 'Ijin Pulang Awal' as const,
               faktorPotongan: 0.5,
             };
-            listChanged = true;
           }
+          return p;
         });
         if (listChanged) {
-          writeStorage(KEYS.PRESENSI, list);
+          writeStorage(KEYS.PRESENSI, patchedList);
+          if (baseList === list) baseList = patchedList;
         }
       }
     }
 
-    // Rekonsiliasi: Jika data manual lokal sudah berhasil masuk ke server (baseList) dengan NIP/Nama, Tanggal & Jenis Ijin yang sama,
-    // maka draft lokal otomatis dibersihkan agar tidak terjadi data dobel.
-    const unsyncedManual = manualList.filter((m) => {
-      const mDate = normalizeIsoDate(m.tanggal);
-      const alreadyInBase = baseList.some(
-        (b) =>
-          b.rowNum &&
-          (b.nip === m.nip || b.nama.trim().toLowerCase() === m.nama.trim().toLowerCase()) &&
-          normalizeIsoDate(b.tanggal) === mDate &&
-          b.jenisIjin === m.jenisIjin
-      );
-      return !alreadyInBase;
-    });
-    if (unsyncedManual.length !== manualList.length) {
-      writeStorage(KEYS.PRESENSI_MANUAL, unsyncedManual);
+    // O(N + M) Indexed Reconciliation: jika draft manual lokal sudah masuk server, bersihkan duplikat
+    const baseNipKeys = new Set<string>();
+    const baseNameKeys = new Set<string>();
+    for (let i = 0; i < baseList.length; i++) {
+      const b = baseList[i];
+      if (!b.rowNum) continue;
+      const bDate = normalizeIsoDate(b.tanggal);
+      if (b.nip) baseNipKeys.add(`${b.nip}|${bDate}|${b.jenisIjin}`);
+      if (b.nama) baseNameKeys.add(`${b.nama.trim().toLowerCase()}|${bDate}|${b.jenisIjin}`);
     }
 
-    const combined = [
-      ...unsyncedManual,
-      ...baseList.filter((b) => !unsyncedManual.some((m) => m.id === b.id)),
-    ];
+    const unsyncedManual = manualList.filter((m) => {
+      const mDate = normalizeIsoDate(m.tanggal);
+      const nipMatch = m.nip ? baseNipKeys.has(`${m.nip}|${mDate}|${m.jenisIjin}`) : false;
+      const nameMatch = m.nama ? baseNameKeys.has(`${m.nama.trim().toLowerCase()}|${mDate}|${m.jenisIjin}`) : false;
+      return !nipMatch && !nameMatch;
+    });
 
-    // Normalisasi durasi menit & pastikan faktor potongan selalu selaras dengan aturan resmi (<= 2 jam bebas potongan)
-    let manualUpdated = false;
+    if (unsyncedManual.length !== manualList.length) {
+      manualDirty = true;
+    }
+
+    // Normalisasi durasi menit & pastikan faktor potongan selalu selaras dengan aturan resmi
     const sanitizedManual = unsyncedManual.map((m) => {
       const durasiMenit = Math.round(Number(m.durasiMenit) || 0);
       const cleanM: PresensiRecord = { ...m, durasiMenit };
       const eff = getEffectiveFaktorPotongan(cleanM);
       if (cleanM.faktorPotongan !== eff) {
-        manualUpdated = true;
+        manualDirty = true;
         return { ...cleanM, faktorPotongan: eff };
       }
       return cleanM;
     });
-    if (manualUpdated) {
+
+    if (manualDirty) {
       writeStorage(KEYS.PRESENSI_MANUAL, sanitizedManual);
     }
 
+    const manualIdSet = new Set(sanitizedManual.map((m) => m.id));
     const finalCombined = [
       ...sanitizedManual,
-      ...baseList.filter((b) => !sanitizedManual.some((m) => m.id === b.id)),
+      ...baseList.filter((b) => !manualIdSet.has(b.id)),
     ];
 
-    return finalCombined.map((p) => {
+    const result = finalCombined.map((p) => {
       const durasiMenit = Math.round(Number(p.durasiMenit) || 0);
       const cleanP: PresensiRecord = {
         ...p,
         durasiMenit,
       };
       const eff = getEffectiveFaktorPotongan(cleanP);
-      return {
-        ...cleanP,
-        faktorPotongan: eff,
-      };
+      return cleanP.faktorPotongan === eff
+        ? cleanP
+        : {
+            ...cleanP,
+            faktorPotongan: eff,
+          };
     });
+
+    const latestBaseRef = readStorage<PresensiRecord[]>(KEYS.PRESENSI, INITIAL_PRESENSI_LIST);
+    const latestManualRef = this.getManualPresensiList();
+    cachedReconciledPresensi = {
+      baseRef: latestBaseRef,
+      manualRef: latestManualRef,
+      result,
+    };
+
+    return result;
   },
   savePresensiList(list: PresensiRecord[]): void {
     const manualList = this.getManualPresensiList();
+    const srvNipKeys = new Set<string>();
+    const srvNameKeys = new Set<string>();
+    for (let i = 0; i < list.length; i++) {
+      const srv = list[i];
+      if (!srv.rowNum) continue;
+      const srvDate = normalizeIsoDate(srv.tanggal);
+      if (srv.nip) srvNipKeys.add(`${srv.nip}|${srvDate}|${srv.jenisIjin}`);
+      if (srv.nama) srvNameKeys.add(`${srv.nama.trim().toLowerCase()}|${srvDate}|${srv.jenisIjin}`);
+    }
+
     const unsyncedManual = manualList.filter((m) => {
       const mDate = normalizeIsoDate(m.tanggal);
-      const alreadyInServer = list.some(
-        (srv) =>
-          srv.rowNum &&
-          (srv.nip === m.nip || srv.nama.trim().toLowerCase() === m.nama.trim().toLowerCase()) &&
-          normalizeIsoDate(srv.tanggal) === mDate &&
-          srv.jenisIjin === m.jenisIjin
-      );
-      return !alreadyInServer;
+      const nipMatch = m.nip ? srvNipKeys.has(`${m.nip}|${mDate}|${m.jenisIjin}`) : false;
+      const nameMatch = m.nama ? srvNameKeys.has(`${m.nama.trim().toLowerCase()}|${mDate}|${m.jenisIjin}`) : false;
+      return !nipMatch && !nameMatch;
     });
     this.saveManualPresensiList(unsyncedManual);
 
+    const unsyncedIdSet = new Set(unsyncedManual.map((m) => m.id));
     const sanitizedList = list.map((item) => ({
       ...item,
       durasiMenit: Math.round(Number(item.durasiMenit) || 0),
     }));
     const merged = [
       ...unsyncedManual,
-      ...sanitizedList.filter((item) => !unsyncedManual.some((m) => m.id === item.id)),
+      ...sanitizedList.filter((item) => !unsyncedIdSet.has(item.id)),
     ];
     writeStorage(KEYS.PRESENSI, merged);
   },
@@ -558,16 +618,14 @@ export const storageService = {
     writeStorage(KEYS.CUTI, list);
   },
   addCuti(rec: CutiRecord): void {
-    const list = this.getCutiList();
-    list.unshift(rec);
+    const list = [rec, ...this.getCutiList()];
     this.saveCutiList(list);
   },
   updateCutiStatus(id: string, status: 'Disetujui' | 'Ditolak', approvedBy: string): void {
-    const list = this.getCutiList();
+    const list = [...this.getCutiList()];
     const idx = list.findIndex((c) => c.id === id);
     if (idx !== -1) {
-      list[idx].status = status;
-      list[idx].disetujuiOleh = approvedBy;
+      list[idx] = { ...list[idx], status, disetujuiOleh: approvedBy };
       this.saveCutiList(list);
     }
   },
@@ -577,19 +635,21 @@ export const storageService = {
     const list = readStorage<MutasiRecord[]>(KEYS.MUTASI, INITIAL_MUTASI_LIST);
     if (list && list.length > 0) {
       let changed = false;
+      const next = [...list];
       INITIAL_MUTASI_LIST.forEach((initM) => {
-        const found = list.find(
+        const found = next.find(
           (m) =>
             m.id === initM.id ||
             (m.nip === initM.nip && m.tanggalEfektif === initM.tanggalEfektif && m.nilaiBaru === initM.nilaiBaru)
         );
         if (!found) {
-          list.unshift(initM);
+          next.unshift(initM);
           changed = true;
         }
       });
       if (changed) {
-        writeStorage(KEYS.MUTASI, list);
+        writeStorage(KEYS.MUTASI, next);
+        return next;
       }
     }
     return list;
@@ -598,15 +658,14 @@ export const storageService = {
     writeStorage(KEYS.MUTASI, list);
   },
   addMutasi(rec: MutasiRecord): void {
-    const list = this.getMutasiList();
-    list.unshift(rec);
+    const list = [rec, ...this.getMutasiList()];
     this.saveMutasiList(list);
   },
   updateMutasiStatus(id: string, status: 'Diterapkan' | 'Dibatalkan'): void {
-    const list = this.getMutasiList();
+    const list = [...this.getMutasiList()];
     const idx = list.findIndex((m) => m.id === id);
     if (idx !== -1) {
-      list[idx].status = status;
+      list[idx] = { ...list[idx], status };
       this.saveMutasiList(list);
     }
   },
@@ -614,7 +673,6 @@ export const storageService = {
   // Calon Karyawan
   getCalonList(): CalonKaryawan[] {
     const list = readStorage<CalonKaryawan[]>(KEYS.CALON, INITIAL_CALON_LIST);
-    // Bersihkan data dummy Bayu Pratama jika sebelumnya tersimpan di storage lokal
     const cleaned = list.filter((c) => c.nama !== 'Bayu Pratama' && c.id !== 'calon-001');
     if (cleaned.length !== list.length) {
       writeStorage(KEYS.CALON, cleaned);
@@ -626,8 +684,7 @@ export const storageService = {
     writeStorage(KEYS.CALON, cleaned);
   },
   addCalon(c: CalonKaryawan): void {
-    const list = this.getCalonList();
-    list.unshift(c);
+    const list = [c, ...this.getCalonList()];
     this.saveCalonList(list);
   },
   deleteCalon(calonId: string): void {
@@ -648,8 +705,7 @@ export const storageService = {
     writeStorage(KEYS.LINKS, list);
   },
   addLink(lnk: LinkArsip): void {
-    const list = this.getLinksList();
-    list.unshift(lnk);
+    const list = [lnk, ...this.getLinksList()];
     this.saveLinksList(list);
   },
   deleteLink(id: string): void {
@@ -665,7 +721,7 @@ export const storageService = {
     writeStorage(KEYS.KPI, list);
   },
   addOrUpdateKpi(kpi: KpiRecord): void {
-    const list = this.getKpiList();
+    const list = [...this.getKpiList()];
     const idx = list.findIndex((k) => k.nip === kpi.nip && k.bulan === kpi.bulan && k.tahun === kpi.tahun);
     if (idx !== -1) {
       list[idx] = kpi;
@@ -680,8 +736,7 @@ export const storageService = {
     return readStorage<DeletedArchiveRecord[]>(KEYS.ARCHIVE, []);
   },
   addDeletedArchive(rec: DeletedArchiveRecord): void {
-    const list = this.getDeletedArchives();
-    list.unshift(rec);
+    const list = [rec, ...this.getDeletedArchives()];
     writeStorage(KEYS.ARCHIVE, list);
   },
 
@@ -713,7 +768,10 @@ export const storageService = {
     };
     const user = readStorage<AuthUser | null>(KEYS.AUTH_USER, fallback);
     if (user && user.portalType === 'management' && !user.allowedTabs.includes('pengaturan')) {
-      user.allowedTabs.push('pengaturan');
+      return {
+        ...user,
+        allowedTabs: [...user.allowedTabs, 'pengaturan'],
+      };
     }
     return user;
   },
@@ -846,7 +904,7 @@ export const storageService = {
     const cleanNip = nip.trim();
     const upperNip = cleanNip.toUpperCase();
     const cleanPin = (newPin || '').trim();
-    const pins = this.getStaffPins();
+    const pins = { ...this.getStaffPins() };
 
     // Simpan baik dengan NIP huruf kapital maupun format asli agar selalu cocok
     pins[upperNip] = cleanPin;
@@ -891,15 +949,22 @@ export const storageService = {
 
   // Reset to initial demo data (PENTING: PIN staf dan branding tetap dilindungi/dipertahankan)
   resetAllData(): void {
-    localStorage.removeItem(KEYS.STAFF);
-    localStorage.removeItem(KEYS.PRESENSI);
-    localStorage.removeItem(KEYS.LEMBUR);
-    localStorage.removeItem(KEYS.CUTI);
-    localStorage.removeItem(KEYS.MUTASI);
-    localStorage.removeItem(KEYS.CALON);
-    localStorage.removeItem(KEYS.LINKS);
-    localStorage.removeItem(KEYS.KPI);
-    localStorage.removeItem(KEYS.ARCHIVE);
+    const resetKeys = [
+      KEYS.STAFF,
+      KEYS.PRESENSI,
+      KEYS.LEMBUR,
+      KEYS.CUTI,
+      KEYS.MUTASI,
+      KEYS.CALON,
+      KEYS.LINKS,
+      KEYS.KPI,
+      KEYS.ARCHIVE,
+    ];
+    resetKeys.forEach((k) => {
+      localStorage.removeItem(k);
+      memoryCache.delete(k);
+    });
+    cachedReconciledPresensi = null;
     // CATATAN: KEYS.STAFF_PINS dan KEYS.STAFF_PINS_BACKUP TIDAK DIHAPUS
     // agar PIN hasil pergantian mandiri oleh staf tidak pernah hilang kembali ke 123456
     window.location.reload();

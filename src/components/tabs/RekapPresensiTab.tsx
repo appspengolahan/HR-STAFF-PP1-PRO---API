@@ -23,6 +23,8 @@ import { PresensiRecord, StaffData } from '../../types';
 import { NAMA_BULAN_INDO } from '../../services/payrollEngine';
 import { formatTanggalIndo } from '../../utils/dateFormatter';
 import { normalizePresensiRecord } from '../../utils/workHoursUtils';
+import { TablePagination } from '../TablePagination';
+import { usePrintMode } from '../../hooks/usePrintMode';
 
 interface RekapPresensiTabProps {
   presensiList: PresensiRecord[];
@@ -55,6 +57,9 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
   // Toggle for Line Trend Chart Metric
   const [trendMetric, setTrendMetric] = useState<'kehadiran' | 'ijin'>('kehadiran');
   const [tableShowAllMonths, setTableShowAllMonths] = useState<boolean>(false);
+  const [matrixPage, setMatrixPage] = useState(1);
+  const matrixPageSize = 25;
+  const { isPrinting, triggerPrint } = usePrintMode();
 
   // Modal Rincian Spesifik Jenis Izin Staf
   const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
@@ -394,13 +399,16 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
     };
   }, [staffRekapList, activeTrendData, monthlyTrendData]);
 
+  const matrixTotalPages = Math.max(1, Math.ceil(staffRekapList.length / matrixPageSize));
+  const safeMatrixPage = Math.min(Math.max(1, matrixPage), matrixTotalPages);
+  const displayedMatrixStaff = useMemo(() => {
+    if (isPrinting) return staffRekapList;
+    const start = (safeMatrixPage - 1) * matrixPageSize;
+    return staffRekapList.slice(start, start + matrixPageSize);
+  }, [staffRekapList, isPrinting, safeMatrixPage]);
+
   const handleExportPdf = () => {
-    const originalTitle = document.title;
-    document.title = `Rekapitulasi_Presensi_${filterTahun}_PT_BATU_KARANG`;
-    window.print();
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 1000);
+    triggerPrint(`Rekapitulasi_Presensi_${filterTahun}_PT_BATU_KARANG`);
   };
 
   // Helper to format float to Indonesian comma representation: e.g. "97,43%"
@@ -1402,7 +1410,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-[11px]">
-              {staffRekapList.map((st) => {
+              {displayedMatrixStaff.map((st) => {
                 const isExcellent = st.pctKehadiran >= 98;
                 const isWarning = st.pctKehadiran < 95;
 
@@ -1464,6 +1472,14 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
           </table>
         </div>
 
+        <TablePagination
+          currentPage={safeMatrixPage}
+          totalItems={staffRekapList.length}
+          pageSize={matrixPageSize}
+          onPageChange={setMatrixPage}
+          itemLabel="rekap staf"
+        />
+
         {/* Print Footer */}
         <div className="hidden print:block p-4 border-t border-black text-right text-xs font-semibold">
           Divisi Produksi I — PT Batu Karang | Dokumen Evaluasi Resmi
@@ -1481,7 +1497,7 @@ export const RekapPresensiTab: React.FC<RekapPresensiTabProps> = ({
           onClick={() => setIsBreakdownModalOpen(false)}
         >
           <div
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-3xl w-full max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header Modal */}

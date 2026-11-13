@@ -37,7 +37,12 @@ export const sheetSyncService = {
     )}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP Error ${res.status}: Gagal membaca sheet ${sheetName}`);
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
     const text = await res.text();
+    const trimmed = text.trim();
+    if (contentType.includes('text/html') || trimmed.startsWith('<')) {
+      throw new Error(`Respons HTML tidak valid saat membaca CSV sheet ${sheetName}`);
+    }
     const lines = text.split('\n').filter((l) => l.trim().length > 0);
     return lines.map((l) => parseCsvLine(l));
   },

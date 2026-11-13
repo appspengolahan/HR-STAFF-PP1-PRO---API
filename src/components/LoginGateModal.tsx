@@ -96,15 +96,15 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
 
   // Click outside listener for staff dropdown
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent) => {
       if (staffDropdownRef.current && !staffDropdownRef.current.contains(e.target as Node)) {
         setIsStaffDropdownOpen(false);
       }
     };
     if (isStaffDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('pointerdown', handleClickOutside);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('pointerdown', handleClickOutside);
   }, [isStaffDropdownOpen]);
 
   // Secret Door State
@@ -339,8 +339,8 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
     <>
       {/* Dual Gate Login Modal */}
       {isOpen && !showDevDoorModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md max-h-[90dvh] overflow-y-auto">
             {/* Header with PP1 brand */}
             <div className="p-6 pb-4 text-center bg-gradient-to-b from-blue-50/50 dark:from-slate-800/40 to-transparent">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-700 via-indigo-600 to-cyan-500 mx-auto flex items-center justify-center text-white text-xl font-black shadow-xl shadow-blue-900/30 mb-3">
@@ -669,8 +669,8 @@ export const LoginGateModal: React.FC<LoginGateModalProps> = ({
 
       {/* Secret Developer Door Modal */}
       {showDevDoorModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-lg animate-in fade-in duration-300">
-          <div className="bg-slate-900 text-slate-100 rounded-3xl shadow-2xl border border-indigo-500/40 w-full max-w-md overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/90 backdrop-blur-lg animate-in fade-in duration-300">
+          <div className="bg-slate-900 text-slate-100 rounded-3xl shadow-2xl border border-indigo-500/40 w-full max-w-md max-h-[90dvh] overflow-y-auto">
             {/* Header */}
             <div className="p-6 text-center border-b border-slate-800 bg-slate-950">
               <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-400 mx-auto flex items-center justify-center mb-2">

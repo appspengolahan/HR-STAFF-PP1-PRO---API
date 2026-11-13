@@ -21,6 +21,8 @@ import { PkwtAlertCard, parsePkwtDate } from '../PkwtAlertCard';
 import { formatTanggalIndo, formatTanggalDmy } from '../../utils/dateFormatter';
 import { storageService, ColumnVisibilitySettings } from '../../services/storageService';
 import { ColumnSettingsModal } from '../modals/ColumnSettingsModal';
+import { TablePagination } from '../TablePagination';
+import { usePrintMode } from '../../hooks/usePrintMode';
 import { appConfirm } from '../../services/dialogService';
 
 interface DatabaseStaffTabProps {
@@ -50,6 +52,9 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
   const [filterSekup, setFilterSekup] = useState<'Semua' | 'Operasional' | 'Administrasi'>('Semua');
   const [filterStatus, setFilterStatus] = useState<string>('Semua');
   const [filterPendidikan, setFilterPendidikan] = useState<string>('Semua');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 25;
+  const { isPrinting, triggerPrint } = usePrintMode();
 
   // Modal State
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -291,8 +296,8 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
     if (mutJenis === 'Sekup') return selectedStaffForMutasi.sekup || '-';
     if (mutJenis === 'Status Kepegawaian') return selectedStaffForMutasi.status || '-';
     if (mutJenis === 'Status Aktif') return selectedStaffForMutasi.statusAktif || 'Aktif';
-    if (mutJenis === 'Gaji Pokok') return `Rp ${(selectedStaffForMutasi.gajiPokok || 0).toLocaleString('id-ID')}`;
-    if (mutJenis === 'Tunjangan Jabatan') return `Rp ${(selectedStaffForMutasi.tunjanganJabatan || 0).toLocaleString('id-ID')}`;
+    if (mutJenis === 'Gaji Pokok') return formatRupiah(selectedStaffForMutasi.gajiPokok || 0);
+    if (mutJenis === 'Tunjangan Jabatan') return formatRupiah(selectedStaffForMutasi.tunjanganJabatan || 0);
     return '-';
   };
 
@@ -309,6 +314,14 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
       return matchSekup && matchStatus && matchPendidikan && matchSearch;
     });
   }, [staffList, filterSekup, filterStatus, filterPendidikan, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const displayedStaff = useMemo(() => {
+    if (isPrinting) return filtered;
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, isPrinting, safePage]);
 
   const handleOpenEdit = (st: StaffData) => {
     setEditingStaff(st);
@@ -459,12 +472,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
   };
 
   const handleExportPdf = () => {
-    const originalTitle = document.title;
-    document.title = `HR Karyawan - Divisi Produksi I - Master Database Staf Karyawan`;
-    window.print();
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 1000);
+    triggerPrint(`HR Karyawan - Divisi Produksi I - Master Database Staf Karyawan`);
   };
 
   return (
@@ -601,7 +609,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filtered.map((st) => {
+              {displayedStaff.map((st) => {
                 const isTetap = st.status === 'TETAP';
                 return (
                   <tr key={st.nip} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
@@ -758,6 +766,15 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
           </table>
         </div>
 
+        {/* Table Pagination (Screen only) */}
+        <TablePagination
+          currentPage={safePage}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemLabel="staf karyawan"
+        />
+
         {/* Print Footer */}
         <div className="hidden print:block p-4 border-t border-black text-right text-xs font-semibold">
           Divisi Produksi I - All Rights Reserved
@@ -766,8 +783,8 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
 
       {/* Modal Tambah Staf Baru */}
       {isAddOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl max-h-[90dvh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60">
               <h3 className="font-bold text-slate-900 dark:text-white text-sm">
                 Registrasi Staf Karyawan Baru
@@ -977,7 +994,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
       {/* Modal Ajukan Mutasi Staf */}
       {selectedStaffForMutasi && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg max-h-[90dvh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 shrink-0">
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-white text-sm">
@@ -1213,7 +1230,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                       <option value="" disabled>-- Pilih Nominal Gaji Pokok Baru --</option>
                       {standardGpOptions.map((val) => (
                         <option key={val} value={val}>
-                          Rp {val.toLocaleString('id-ID')} {selectedStaffForMutasi.gajiPokok === val ? '(Gaji Saat Ini)' : ''}
+                          {formatRupiah(val)} {selectedStaffForMutasi.gajiPokok === val ? '(Gaji Saat Ini)' : ''}
                         </option>
                       ))}
                       <option value="__custom__">➕ Ketik Nominal Gaji Pokok Kustom...</option>
@@ -1233,7 +1250,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                         />
                         {Boolean(Number(mutNilaiBaru)) && (
                           <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 block">
-                            Pratinjau: Rp {Number(mutNilaiBaru).toLocaleString('id-ID')}
+                            Pratinjau: {formatRupiah(Number(mutNilaiBaru))}
                           </span>
                         )}
                       </div>
@@ -1261,7 +1278,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                       <option value="" disabled>-- Pilih Nominal Tunjangan Jabatan Baru --</option>
                       {standardTjOptions.map((val) => (
                         <option key={val} value={val}>
-                          Rp {val.toLocaleString('id-ID')} {val === 0 ? '(Tanpa Tunjangan)' : ''} {selectedStaffForMutasi.tunjanganJabatan === val ? '(Saat Ini)' : ''}
+                          {formatRupiah(val)} {val === 0 ? '(Tanpa Tunjangan)' : ''} {selectedStaffForMutasi.tunjanganJabatan === val ? '(Saat Ini)' : ''}
                         </option>
                       ))}
                       <option value="__custom__">➕ Ketik Nominal Tunjangan Kustom...</option>
@@ -1281,7 +1298,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
                         />
                         {Boolean(Number(mutNilaiBaru)) && (
                           <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 block">
-                            Pratinjau: Rp {Number(mutNilaiBaru).toLocaleString('id-ID')}
+                            Pratinjau: {formatRupiah(Number(mutNilaiBaru))}
                           </span>
                         )}
                       </div>
@@ -1331,7 +1348,7 @@ export const DatabaseStaffTab: React.FC<DatabaseStaffTabProps> = ({
       {/* Modal Edit Data Staf (Termasuk Pendidikan Terakhir) */}
       {isEditOpen && editingStaff && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl max-h-[90dvh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">

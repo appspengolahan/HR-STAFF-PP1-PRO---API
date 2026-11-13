@@ -388,9 +388,11 @@ export function calculateSlipGaji(
   };
 }
 
+const RUPIAH_NUMBER_FORMATTER = new Intl.NumberFormat('id-ID');
+
 export function formatRupiah(value: number): string {
   if (isNaN(value)) return 'Rp 0';
-  return 'Rp ' + Math.round(value).toLocaleString('id-ID');
+  return 'Rp ' + RUPIAH_NUMBER_FORMATTER.format(Math.round(value));
 }
 
 export function formatPersen(value: number): string {

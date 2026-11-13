@@ -40,7 +40,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-16 pb-[env(safe-area-inset-bottom)] bg-slate-900/95 backdrop-blur-md border-t border-slate-800 z-30 flex items-center justify-around px-1 lg:hidden shadow-2xl no-print">
+    <nav className="fixed bottom-0 left-0 right-0 min-h-16 h-auto pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] bg-slate-900/95 backdrop-blur-md border-t border-slate-800 z-30 flex items-center justify-around px-1 lg:hidden shadow-2xl no-print">
       {items.map((it) => {
         const Icon = it.icon;
         const isActive = activeTab === it.id;

@@ -19,6 +19,8 @@ import {
   getEffectiveFaktorPotongan,
 } from '../../services/payrollEngine';
 import { ThermalSlipModal } from '../modals/ThermalSlipModal';
+import { TablePagination } from '../TablePagination';
+import { usePrintMode } from '../../hooks/usePrintMode';
 
 interface SlipGajiTabProps {
   staffList: StaffData[];
@@ -47,6 +49,9 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
   // Filter state for Rekap Seluruh Staf
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOnlyDeductions, setFilterOnlyDeductions] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 25;
+  const { isPrinting, triggerPrint } = usePrintMode();
 
   const selectedStaff = useMemo(() => {
     return staffList.find((s) => s.nip === selectedNip) || staffList[0] || null;
@@ -203,13 +208,18 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
     });
   }, [allStaffSlips, searchQuery, filterOnlyDeductions]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredAllStaffSlips.length / pageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const displayedStaffSlips = useMemo(() => {
+    if (isPrinting) return filteredAllStaffSlips;
+    const start = (safePage - 1) * pageSize;
+    return filteredAllStaffSlips.slice(start, start + pageSize);
+  }, [filteredAllStaffSlips, isPrinting, safePage]);
+
   const handlePrintA4 = () => {
-    const originalTitle = document.title;
-    document.title = `HR Karyawan - Divisi Produksi I - Slip Gaji ${selectedStaff?.nama || 'Staf'} ${NAMA_BULAN_INDO[selectedBulan - 1]} ${selectedTahun}`;
-    window.print();
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 1000);
+    triggerPrint(
+      `HR Karyawan - Divisi Produksi I - Slip Gaji ${selectedStaff?.nama || 'Staf'} ${NAMA_BULAN_INDO[selectedBulan - 1]} ${selectedTahun}`
+    );
   };
 
   const handleSelectStaffForSlip = (nip: string) => {
@@ -452,7 +462,8 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-                  {filteredAllStaffSlips.map(({ staff, slip }, index) => {
+                  {displayedStaffSlips.map(({ staff, slip }, index) => {
+                    const rowNumber = isPrinting ? index + 1 : (safePage - 1) * pageSize + index + 1;
                     const isAdiTri = staff.nip === 'BK-PP1-023';
                     const hasPotongan = slip.hariTidakDibayar > 0;
 
@@ -468,7 +479,7 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
                         }`}
                       >
                         <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px]">
-                          {index + 1}
+                          {rowNumber}
                         </td>
                         <td className="py-3 px-3">
                           <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
@@ -540,6 +551,14 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
                 </tbody>
               </table>
             </div>
+
+            <TablePagination
+              currentPage={safePage}
+              totalItems={filteredAllStaffSlips.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              itemLabel="slip gaji staf"
+            />
           </div>
         </div>
       )}

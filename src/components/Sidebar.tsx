@@ -75,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className={`fixed top-14 h-[calc(100vh-56px)] left-0 z-20 hidden lg:flex flex-col bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 select-none ${
+      className={`fixed top-14 h-[calc(100dvh-56px)] left-0 z-20 hidden lg:flex flex-col bg-slate-900 text-slate-300 border-r border-slate-800 transition-all duration-300 select-none ${
         collapsed ? 'w-[68px]' : 'w-64'
       } no-print print:hidden`}
     >
@@ -116,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               key={item.id}
               onClick={() => onSelectTab(item.id)}
               title={collapsed ? item.label : undefined}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group relative ${
+              className={`w-full min-h-[44px] flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group relative ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30 font-bold'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/80'

@@ -21,6 +21,8 @@ import {
 import { PresensiRecord, StaffData, JenisIjin, AuthUser } from '../../types';
 import { NAMA_BULAN_INDO } from '../../services/payrollEngine';
 import { SuratIjinModal } from '../modals/SuratIjinModal';
+import { TablePagination } from '../TablePagination';
+import { usePrintMode } from '../../hooks/usePrintMode';
 import { getNamaHariIndo, formatTanggalDmy, getTodayIsoDate } from '../../utils/dateFormatter';
 import { storageService, DEFAULT_GAS_API_URL } from '../../services/storageService';
 import { gasClient } from '../../services/gasClient';
@@ -74,6 +76,13 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   const [filterTahun, setFilterTahun] = useState<number>(now.getFullYear());
   const [filterNama, setFilterNama] = useState<string>(isStaffPortal && currentUserNip ? currentUserNip : '');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 25;
+  const { isPrinting, triggerPrint } = usePrintMode();
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterBulan, filterTahun, filterNama, searchQuery]);
 
   // Evaluasi peran staf (staf dilarang mengedit catatan presensi)
   const isStaffUser = Boolean(
@@ -220,9 +229,9 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
     }
   }, [formStaffNip, staffList]);
 
-  // Click-outside listener for staff combobox
+  // Click-outside listener for staff combobox (unified touch + mouse)
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent) => {
       if (staffDropdownRef.current && !staffDropdownRef.current.contains(e.target as Node)) {
         setIsStaffDropdownOpen(false);
         const st = staffList.find((s) => s.nip === formStaffNip);
@@ -234,9 +243,9 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
       }
     };
     if (isStaffDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('pointerdown', handleClickOutside);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('pointerdown', handleClickOutside);
   }, [isStaffDropdownOpen, formStaffNip, staffList, staffSearchQuery]);
 
   // Staff suggestions filtered only by name / nip
@@ -566,6 +575,14 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
       });
   }, [presensiList, filterBulan, filterTahun, filterNama, searchQuery, isStaffPortal, currentUserNip, currentUserStaff, currentUser]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredList.length / pageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const displayedRows = useMemo(() => {
+    if (isPrinting) return filteredList;
+    const start = (safePage - 1) * pageSize;
+    return filteredList.slice(start, start + pageSize);
+  }, [filteredList, isPrinting, safePage]);
+
   const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -691,12 +708,9 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
   };
 
   const handleExportPdf = () => {
-    const originalTitle = document.title;
-    document.title = `HR Karyawan - Divisi Produksi I - Presensi & Ijin Bulan ${NAMA_BULAN_INDO[filterBulan - 1]} ${filterTahun}`;
-    window.print();
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 1000);
+    triggerPrint(
+      `HR Karyawan - Divisi Produksi I - Presensi & Ijin Bulan ${NAMA_BULAN_INDO[filterBulan - 1]} ${filterTahun}`
+    );
   };
 
   const selectedStaffData = useMemo(() => {
@@ -799,13 +813,13 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {unsyncedRecords.length > 0 && (
               <button
                 onClick={handlePushAllUnsynced}
                 disabled={isPushingAll}
                 title="Kirim semua data presensi yang baru diinput di web apps ke Google Spreadsheet tujuan"
-                className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                className="min-h-[44px] sm:min-h-0 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
               >
                 <UploadCloud className={`w-4 h-4 ${isPushingAll ? 'animate-spin' : ''}`} />
                 {isPushingAll ? 'Mengirim...' : `Kirim ke Sheet (${unsyncedRecords.length})`}
@@ -816,7 +830,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                 onClick={() => onSyncPresensi()}
                 disabled={isSyncing}
                 title="Tarik data presensi live langsung dari Google Apps Script"
-                className="px-3.5 py-2 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-800 transition-colors disabled:opacity-50"
+                className="min-h-[44px] sm:min-h-0 px-3.5 py-2 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-800 transition-colors disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                 {isSyncing ? 'Menarik GAS...' : 'Tarik Data GAS'}
@@ -828,14 +842,14 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                 setFormTglAkhir('');
                 setIsFormOpen(true);
               }}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+              className="min-h-[44px] sm:min-h-0 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
             >
               <Plus className="w-4 h-4" />
               Catat Ijin / Pengecualian
             </button>
             <button
               onClick={handleExportPdf}
-              className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-colors"
+              className="min-h-[44px] sm:min-h-0 px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-colors"
             >
               <Printer className="w-4 h-4" />
               Export PDF
@@ -903,14 +917,14 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredList.length === 0 ? (
+              {displayedRows.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-slate-400">
                     Tidak ada catatan ijin/ketidakhadiran pada periode ini. Seluruh staf tercatat Hadir Penuh.
                   </td>
                 </tr>
               ) : (
-                filteredList.map((row) => {
+                displayedRows.map((row) => {
                   let badgeStyle = 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300';
                   if (row.jenisIjin.startsWith('Sakit')) {
                     badgeStyle = 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
@@ -1031,6 +1045,15 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
           </table>
         </div>
 
+        {/* Table Pagination (Screen only) */}
+        <TablePagination
+          currentPage={safePage}
+          totalItems={filteredList.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemLabel="catatan presensi"
+        />
+
         {/* Print Footer */}
         <div className="hidden print:block p-4 border-t border-black text-right text-xs font-semibold">
           Divisi Produksi I - All Rights Reserved
@@ -1039,8 +1062,8 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
 
       {/* Form Add Ijin Modal */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg max-h-[90dvh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60">
               <h3 className="font-bold text-slate-900 dark:text-white text-sm">
                 Catat Ijin / Ketidakhadiran Baru
@@ -1053,7 +1076,7 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSubmitForm} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleSubmitForm} className="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">Tanggal Awal</label>
@@ -1192,12 +1215,8 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
                                 key={st.nip}
                                 type="button"
                                 onClick={() => handleSelectStaff(st)}
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  handleSelectStaff(st);
-                                }}
                                 onMouseEnter={() => setHighlightedStaffIdx(idx)}
-                                className={`w-full px-3 py-2 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer text-xs ${
+                                className={`w-full min-h-[44px] px-3 py-2 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer text-xs ${
                                   isSelected
                                     ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold'
                                     : isHighlighted
@@ -1417,8 +1436,8 @@ export const PresensiTab: React.FC<PresensiTabProps> = ({
 
       {/* Modal Edit Presensi & Ijin */}
       {!isStaffUser && selectedRecordForEdit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-xl w-full p-5 sm:p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 max-h-[90dvh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <div>
                 <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">

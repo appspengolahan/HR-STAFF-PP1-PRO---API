@@ -19,6 +19,7 @@ import {
   FileDown,
 } from 'lucide-react';
 import { appAlert } from '../../services/dialogService';
+import { formatTanggalIndo } from '../../utils/dateFormatter';
 
 export type QrTargetType = 'staff-login' | 'management-login' | 'public-portal';
 
@@ -281,11 +282,7 @@ export const QrLoginModal: React.FC<QrLoginModalProps> = ({
       // 6. Bottom Copyright Note
       ctx.fillStyle = '#94a3b8';
       ctx.font = '15px system-ui, -apple-system, sans-serif';
-      const nowStr = new Date().toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      });
+      const nowStr = formatTanggalIndo(new Date());
       ctx.fillText(`Dokumen Resmi Sistem HR Staf Divisi Produksi I — Dicetak pada: ${nowStr}`, width / 2, height - 60);
 
       // Download Trigger
@@ -335,8 +332,8 @@ export const QrLoginModal: React.FC<QrLoginModalProps> = ({
       <div
         className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl flex flex-col text-slate-800 dark:text-slate-100 transition-all duration-300 overflow-hidden ${
           isExpanded
-            ? 'w-full max-w-4xl h-[95vh] max-h-[920px]'
-            : 'w-full max-w-2xl max-h-[92vh]'
+            ? 'w-full max-w-4xl h-[95dvh] max-h-[920px]'
+            : 'w-full max-w-2xl max-h-[92dvh]'
         }`}
       >
         {/* Header Modal */}

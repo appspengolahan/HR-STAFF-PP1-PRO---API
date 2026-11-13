@@ -15,6 +15,9 @@ export interface GasResponse<T = unknown> {
 
 const INDO_DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+let isStaticHostingMode = false;
+
 export function cleanGasTime(val: unknown, fallback: string = '08:00'): string {
   if (!val) return fallback;
   const s = String(val).trim();
@@ -22,18 +25,13 @@ export function cleanGasTime(val: unknown, fallback: string = '08:00'): string {
     return s.substring(0, 5);
   }
   if (s.includes('T')) {
-    try {
-      const dt = new Date(s);
-      if (!isNaN(dt.getTime())) {
-        const parts = new Intl.DateTimeFormat('id-ID', {
-          timeZone: 'Asia/Jakarta',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-        }).format(dt);
-        return parts.replace('.', ':');
-      }
-    } catch (_) {}
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime())) {
+      const wib = new Date(dt.getTime() + WIB_OFFSET_MS);
+      const hh = String(wib.getUTCHours()).padStart(2, '0');
+      const mm = String(wib.getUTCMinutes()).padStart(2, '0');
+      return `${hh}:${mm}`;
+    }
   }
   return s.length > 5 ? s.substring(0, 5) : s || fallback;
 }
@@ -41,7 +39,7 @@ export function cleanGasTime(val: unknown, fallback: string = '08:00'): string {
 /**
  * Helper to fetch GAS API with intelligent fallback:
  * If an internal route (like /api or /api/gas) returns HTML (which Cloudflare SPA mode serves as index.html),
- * or if the endpoint fails, it automatically falls back to direct fetch to DEFAULT_GAS_API_URL with CORS.
+ * or if the endpoint fails, it caches static hosting mode and automatically falls back to direct fetch to DEFAULT_GAS_API_URL with CORS.
  */
 async function safeGasFetch(
   apiUrl: string,
@@ -58,8 +56,9 @@ async function safeGasFetch(
 
   // Clean apiUrl
   let targetUrl = (apiUrl || '').trim();
-  if (!targetUrl || targetUrl.startsWith('/') || targetUrl.includes('/api')) {
-    if (!targetUrl) targetUrl = DEFAULT_GAS_API_URL;
+  const isInternalApiRoute = targetUrl.startsWith('/') || targetUrl.includes('/api');
+  if (!targetUrl || (isInternalApiRoute && isStaticHostingMode)) {
+    targetUrl = DEFAULT_GAS_API_URL;
   }
 
   const buildUrl = (baseUrl: string) => {
@@ -90,10 +89,12 @@ async function safeGasFetch(
 
     const contentType = (res.headers.get('content-type') || '').toLowerCase();
     const text = await res.text();
+    const trimmedLower = text.trim().toLowerCase();
     const isHtml =
       contentType.includes('text/html') ||
-      text.trim().toLowerCase().startsWith('<!doctype html') ||
-      text.trim().toLowerCase().startsWith('<html') ||
+      trimmedLower.startsWith('<!doctype html') ||
+      trimmedLower.startsWith('<html') ||
+      trimmedLower.startsWith('<') ||
       text.includes('<div id="root"');
 
     let json: any = null;
@@ -111,6 +112,9 @@ async function safeGasFetch(
 
     // If response is HTML (Cloudflare SPA fallback because /api has no backend proxy) or 404/500 on relative path
     if (result.isHtml || (!result.ok && (targetUrl.startsWith('/') || targetUrl.includes('/api')))) {
+      if (targetUrl.startsWith('/') || targetUrl.includes('/api')) {
+        isStaticHostingMode = true;
+      }
       if (targetUrl !== DEFAULT_GAS_API_URL) {
         console.warn(
           `[gasClient] Deteksi respons HTML / route internal pada "${targetUrl}". Mengaktifkan otomatis direct fetch ke endpoint Google Apps Script (${DEFAULT_GAS_API_URL}) dengan CORS.`
@@ -122,6 +126,9 @@ async function safeGasFetch(
   } catch (err) {
     // Network / CORS error on targetUrl: fallback to direct GAS endpoint
     if (targetUrl !== DEFAULT_GAS_API_URL) {
+      if (targetUrl.startsWith('/') || targetUrl.includes('/api')) {
+        isStaticHostingMode = true;
+      }
       console.warn(
         `[gasClient] Fetch ke "${targetUrl}" gagal (${err}). Mengalihkan ke direct fetch Google Apps Script (${DEFAULT_GAS_API_URL})...`
       );

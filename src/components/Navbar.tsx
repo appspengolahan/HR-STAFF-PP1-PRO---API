@@ -104,9 +104,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
-  // Outside click & Escape key listener to close dropdowns
+  // Outside pointer & Escape key listener to close dropdowns cleanly on touch and mouse
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent) => {
       const target = e.target as Node;
       if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         setIsDropdownOpen(false);
@@ -122,10 +122,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('pointerdown', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('pointerdown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
@@ -224,7 +224,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ? 'Auto Refresh Aktif (Icon terus berputar & data otomatis terupdate dari Spreadsheet). Klik untuk mematikan.'
                 : 'Auto Refresh Nonaktif. Klik untuk mengaktifkan pembaruan data otomatis terus menerus.'
             }
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer select-none text-xs font-semibold ${
+            className={`min-h-[40px] sm:min-h-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer select-none text-xs font-semibold ${
               isAutoRefreshActive
                 ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 shadow-xs ring-1 ring-emerald-400/20'
                 : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
@@ -257,7 +257,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ? 'Mode Datasheet AKTIF (Alternatif Langsung CSV): Penarikan data diprioritaskan langsung ke file Google Spreadsheet (MASTER_STAFF & LOG_PRESENSI). Klik untuk kembali ke REST API GAS.'
                 : 'Mode REST API GAS Aktif. Klik untuk mengaktifkan alternatif "Tarik Dari Datasheet" (langsung baca CSV Google Spreadsheet).'
             }
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer select-none text-xs font-semibold ${
+            className={`min-h-[40px] sm:min-h-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer select-none text-xs font-semibold ${
               isDatasheetSourceActive
                 ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700 shadow-xs ring-1 ring-blue-400/20'
                 : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
@@ -287,7 +287,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <button
           onClick={onToggleTheme}
           title={themeMode === 'dark' ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'}
-          className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
         >
           {themeMode === 'dark' ? (
             <Sun className="w-4 h-4 text-amber-400" />
@@ -509,7 +509,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* ISI MENU DROPDOWN TERPADU (POPOVER CARD) */}
           {isDropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150 text-xs">
+            <div className="absolute right-0 top-full mt-2 w-[min(calc(100vw-1.5rem),20rem)] max-h-[calc(100dvh-5rem)] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150 text-xs">
               {/* Header Kartu Profil Pengguna */}
               {currentUser && (
                 <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-100 dark:border-slate-800/80 mb-2">

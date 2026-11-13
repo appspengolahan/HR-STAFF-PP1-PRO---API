@@ -490,7 +490,7 @@ export const PublicInformationPortal: React.FC<PublicInformationPortalProps> = (
   }, [staffMonthlyRanking, staffYearlyRanking, filterTerendahPeriod]);
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-[100dvh] pb-[env(safe-area-inset-bottom)] bg-slate-900 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white overflow-x-hidden">
       {/* 1. Header Publik (Top Bar) */}
       <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
