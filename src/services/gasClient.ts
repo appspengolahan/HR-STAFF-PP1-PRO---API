@@ -75,12 +75,20 @@ async function safeGasFetch(
       headers.Accept = 'application/json, text/plain, */*';
     }
 
-    const res = await fetch(fullUrl, {
-      method,
-      headers,
-      body: options?.body,
-      mode,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    let res: Response;
+    try {
+      res = await fetch(fullUrl, {
+        method,
+        headers,
+        body: options?.body,
+        mode,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     // If mode is 'no-cors', response is opaque (status 0, ok false, empty body)
     if (mode === 'no-cors') {

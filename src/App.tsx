@@ -212,13 +212,17 @@ export default function App() {
 
   const isSyncInFlightRef = useRef(false);
   const lastSyncAtRef = useRef(0);
+  const consecutiveSyncFailuresRef = useRef(0);
+  const nextAllowedSyncAtRef = useRef(0);
 
   const handleSyncPresensiLive = useCallback(
     async (isSilent = false, forceDatasheet = false) => {
       const now = Date.now();
       if (isSyncInFlightRef.current) return;
-      if (isSilent && !forceDatasheet && now - lastSyncAtRef.current < 15000) {
-        return;
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+      if (isSilent && !forceDatasheet) {
+        if (now - lastSyncAtRef.current < 15000) return;
+        if (now < nextAllowedSyncAtRef.current) return;
       }
 
       isSyncInFlightRef.current = true;
@@ -230,6 +234,8 @@ export default function App() {
         if (shouldPullFromDatasheet) {
           // Tarik data langsung dari Google Sheets Asli HR Staff (1KzEFolz...)
           const syncRes = await sheetSyncService.syncAllFromLiveSheet();
+          consecutiveSyncFailuresRef.current = 0;
+          nextAllowedSyncAtRef.current = 0;
           const latestPresensi = storageService.getPresensiList();
           setPresensiList(latestPresensi);
           setStaffList(storageService.getStaffList());
@@ -254,6 +260,8 @@ export default function App() {
         if (hasValidStaffGasUrl) {
           const res = await gasClient.fetchPresensi(activeUrl, staffListRef.current);
           if (res.status === 'success' && res.data && res.data.length > 0) {
+            consecutiveSyncFailuresRef.current = 0;
+            nextAllowedSyncAtRef.current = 0;
             storageService.savePresensiList(res.data);
             const mergedPresensi = storageService.getPresensiList();
             setPresensiList(mergedPresensi);
@@ -270,6 +278,8 @@ export default function App() {
 
         // Fallback: Tarik dari datasheet jika GAS tidak merespons
         const syncRes = await sheetSyncService.syncAllFromLiveSheet();
+        consecutiveSyncFailuresRef.current = 0;
+        nextAllowedSyncAtRef.current = 0;
         const latestPresensi = storageService.getPresensiList();
         setPresensiList(latestPresensi);
         setStaffList(storageService.getStaffList());
@@ -282,9 +292,16 @@ export default function App() {
           setTimeout(() => setSyncToastMessage(null), 6000);
         }
       } catch (err) {
-        console.warn('Gagal sync presensi staf:', err);
+        consecutiveSyncFailuresRef.current += 1;
+        // Exponential backoff untuk sync otomatis: 60s -> 120s -> maks 300s (5 menit)
+        const backoffMs = Math.min(300000, 60000 * Math.pow(2, Math.min(consecutiveSyncFailuresRef.current - 1, 2)));
+        nextAllowedSyncAtRef.current = Date.now() + backoffMs;
+        console.warn(
+          `Gagal sync presensi staf (cache lokal dipertahankan, backoff ${Math.round(backoffMs / 1000)}d):`,
+          err
+        );
         if (!isSilent) {
-          setSyncToastMessage(`Gagal menarik data: ${err instanceof Error ? err.message : String(err)}`);
+          setSyncToastMessage(`Gagal menarik data (data lokal aman dipertahankan): ${err instanceof Error ? err.message : String(err)}`);
           setTimeout(() => setSyncToastMessage(null), 5000);
         }
       } finally {
@@ -315,11 +332,11 @@ export default function App() {
     handleSyncPresensiLive(false, true);
   };
 
-  // Auto-sync on app load & when window regains focus (cooldown-guarded)
+  // Auto-sync on app load & when window regains focus (cooldown- & backoff-guarded)
   useEffect(() => {
     handleSyncPresensiLive(true);
     const handleFocus = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && (typeof navigator === 'undefined' || navigator.onLine)) {
         handleSyncPresensiLive(true);
       }
     };
@@ -345,14 +362,15 @@ export default function App() {
     });
   };
 
-  // Efek interval polling background refresh saat aktif
+  // Efek interval polling background refresh saat aktif (hanya menembak saat tab aktif & online)
   useEffect(() => {
     if (!isAutoRefreshActive) return;
 
-    // Refresh background berkala setiap 30 detik agar data selalu terupdate
     const interval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
       handleSyncPresensiLive(true);
-    }, 30000);
+    }, 45000);
 
     return () => clearInterval(interval);
   }, [isAutoRefreshActive, handleSyncPresensiLive]);

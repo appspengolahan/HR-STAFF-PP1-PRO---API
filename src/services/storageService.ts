@@ -275,6 +275,7 @@ export const storageService = {
     return list;
   },
   saveStaffList(list: StaffData[]): void {
+    if (!Array.isArray(list) || list.length === 0) return;
     writeStorage(KEYS.STAFF, list);
   },
   addStaff(staff: StaffData): void {
@@ -494,6 +495,7 @@ export const storageService = {
     return result;
   },
   savePresensiList(list: PresensiRecord[]): void {
+    if (!Array.isArray(list) || list.length === 0) return;
     const manualList = this.getManualPresensiList();
     const srvNipKeys = new Set<string>();
     const srvNameKeys = new Set<string>();
@@ -702,6 +704,7 @@ export const storageService = {
     return list;
   },
   saveLinksList(list: LinkArsip[]): void {
+    if (!Array.isArray(list) || list.length === 0) return;
     writeStorage(KEYS.LINKS, list);
   },
   addLink(lnk: LinkArsip): void {

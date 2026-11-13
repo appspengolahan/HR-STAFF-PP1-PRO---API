@@ -50,7 +50,7 @@ export const GasCenterModal: React.FC<GasCenterModalProps> = ({
     try {
       const staff = storageService.getStaffList();
       const res = await gasClient.fetchPresensi(apiUrl.trim(), staff);
-      if (res.status === 'success' && res.data) {
+      if (res.status === 'success' && res.data && res.data.length > 0) {
         storageService.savePresensiList(res.data);
         const octRecords = res.data.filter((r) => r.bulan === 10 && r.tahun === 2026);
         setTestLog(
