@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   FileSpreadsheet,
   Printer,
@@ -10,6 +10,11 @@ import {
   Eye,
   AlertTriangle,
   ArrowRight,
+  X,
+  ChevronDown,
+  Check,
+  EyeOff,
+  ShieldCheck,
 } from 'lucide-react';
 import { StaffData, PresensiRecord, LemburRecord, SlipGajiRecord } from '../../types';
 import {
@@ -39,12 +44,26 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
 }) => {
   const now = new Date();
   const [viewMode, setViewMode] = useState<'individual' | 'all'>('individual');
+  // Default kosong agar tidak langsung menampilkan slip gaji siapapun saat halaman dibuka
   const [selectedNip, setSelectedNip] = useState<string>(
-    isStaffPortal && currentUserNip ? currentUserNip : staffList[0]?.nip || 'BK-PP1-023'
+    isStaffPortal && currentUserNip ? currentUserNip : ''
   );
   const [selectedBulan, setSelectedBulan] = useState<number>(now.getMonth() + 1);
   const [selectedTahun, setSelectedTahun] = useState<number>(now.getFullYear());
   const [isThermalOpen, setIsThermalOpen] = useState(false);
+
+  // Kotak saran nama staf (Autocomplete Combobox)
+  const [staffQuery, setStaffQuery] = useState<string>(() => {
+    if (isStaffPortal && currentUserNip) {
+      const own = staffList.find((s) => s.nip === currentUserNip);
+      return own ? own.nama : '';
+    }
+    return '';
+  });
+  const [isStaffDropdownOpen, setIsStaffDropdownOpen] = useState(false);
+  const [highlightedStaffIdx, setHighlightedStaffIdx] = useState(0);
+  const staffDropdownRef = useRef<HTMLDivElement>(null);
+  const staffInputRef = useRef<HTMLInputElement>(null);
 
   // Filter state for Rekap Seluruh Staf
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,8 +72,52 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
   const pageSize = 25;
   const { isPrinting, triggerPrint } = usePrintMode();
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterOnlyDeductions, selectedBulan, selectedTahun]);
+
+  // Sinkronisasi NIP saat berada di Portal Mandiri Staf (dan reset saat keluar dari mode portal staf)
+  const prevIsStaffPortalRef = useRef(isStaffPortal);
+  useEffect(() => {
+    if (isStaffPortal && currentUserNip) {
+      setSelectedNip(currentUserNip);
+      const own = staffList.find((s) => s.nip === currentUserNip);
+      if (own) setStaffQuery(own.nama);
+    } else if (prevIsStaffPortalRef.current && !isStaffPortal) {
+      setSelectedNip('');
+      setStaffQuery('');
+    }
+    prevIsStaffPortalRef.current = isStaffPortal;
+  }, [isStaffPortal, currentUserNip, staffList]);
+
+  // Tutup kotak saran saat tap/klik di luar area
+  useEffect(() => {
+    const handleClickOutside = (e: PointerEvent) => {
+      if (staffDropdownRef.current && !staffDropdownRef.current.contains(e.target as Node)) {
+        setIsStaffDropdownOpen(false);
+        if (selectedNip) {
+          const st = staffList.find((s) => s.nip === selectedNip);
+          if (st) setStaffQuery(st.nama);
+        }
+      }
+    };
+    if (isStaffDropdownOpen) {
+      document.addEventListener('pointerdown', handleClickOutside);
+    }
+    return () => document.removeEventListener('pointerdown', handleClickOutside);
+  }, [isStaffDropdownOpen, selectedNip, staffList]);
+
+  const staffSuggestions = useMemo(() => {
+    const q = staffQuery.trim().toLowerCase();
+    if (!q) return staffList;
+    return staffList.filter(
+      (s) => s.nama.toLowerCase().includes(q) || s.nip.toLowerCase().includes(q)
+    );
+  }, [staffList, staffQuery]);
+
   const selectedStaff = useMemo(() => {
-    return staffList.find((s) => s.nip === selectedNip) || staffList[0] || null;
+    if (!selectedNip) return null;
+    return staffList.find((s) => s.nip === selectedNip) || null;
   }, [staffList, selectedNip]);
 
   // Helper untuk mengekstrak bulan dan tahun presensi secara tangguh
@@ -222,8 +285,51 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
     );
   };
 
+  const handleSelectStaff = (st: StaffData) => {
+    setSelectedNip(st.nip);
+    setStaffQuery(st.nama);
+    setIsStaffDropdownOpen(false);
+  };
+
+  const handleClearSelectedStaff = () => {
+    setSelectedNip('');
+    setStaffQuery('');
+    setHighlightedStaffIdx(0);
+    setIsStaffDropdownOpen(false);
+    staffInputRef.current?.focus();
+  };
+
+  const handleStaffKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isStaffDropdownOpen && (e.key === 'ArrowDown' || e.key === 'Enter')) {
+      setIsStaffDropdownOpen(true);
+      return;
+    }
+    if (!isStaffDropdownOpen) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedStaffIdx((prev) =>
+        staffSuggestions.length > 0 ? (prev + 1) % staffSuggestions.length : 0
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedStaffIdx((prev) =>
+        staffSuggestions.length > 0 ? (prev - 1 + staffSuggestions.length) % staffSuggestions.length : 0
+      );
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const target = staffSuggestions[highlightedStaffIdx];
+      if (target) handleSelectStaff(target);
+    } else if (e.key === 'Escape') {
+      setIsStaffDropdownOpen(false);
+    }
+  };
+
   const handleSelectStaffForSlip = (nip: string) => {
+    const target = staffList.find((s) => s.nip === nip);
     setSelectedNip(nip);
+    setStaffQuery(target ? target.nama : '');
+    setIsStaffDropdownOpen(false);
     setViewMode('individual');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -269,21 +375,110 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
           )}
 
           {viewMode === 'individual' && !isStaffPortal ? (
-            <div>
+            <div ref={staffDropdownRef} className="relative min-w-[240px] sm:min-w-[270px]">
               <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                Pilih Karyawan Staf
+                Cari &amp; Pilih Nama Staf
               </label>
-              <select
-                value={selectedNip}
-                onChange={(e) => setSelectedNip(e.target.value)}
-                className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-white min-w-[210px]"
-              >
-                {staffList.map((s) => (
-                  <option key={s.nip} value={s.nip}>
-                    {s.nama} ({s.nip})
-                  </option>
-                ))}
-              </select>
+              <div className="relative flex items-center">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+                <input
+                  ref={staffInputRef}
+                  type="text"
+                  value={staffQuery}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setStaffQuery(val);
+                    if (!val.trim()) {
+                      setSelectedNip('');
+                    } else if (selectedStaff && val.trim().toLowerCase() !== selectedStaff.nama.toLowerCase()) {
+                      setSelectedNip('');
+                    }
+                    setHighlightedStaffIdx(0);
+                    if (!isStaffDropdownOpen) setIsStaffDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsStaffDropdownOpen(true)}
+                  onKeyDown={handleStaffKeyDown}
+                  placeholder="Ketik nama staf untuk buka slip..."
+                  className="w-full min-h-[40px] pl-8 pr-16 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="absolute right-1.5 flex items-center gap-0.5">
+                  {(staffQuery || selectedNip) && (
+                    <button
+                      type="button"
+                      onClick={handleClearSelectedStaff}
+                      title="Sembunyikan / bersihkan pilihan staf"
+                      className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsStaffDropdownOpen((prev) => !prev)}
+                    title="Tampilkan daftar saran nama staf"
+                    className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                        isStaffDropdownOpen ? 'rotate-180 text-blue-600' : ''
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {isStaffDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60">
+                  <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-950/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 flex items-center justify-between">
+                    <span>Saran Nama Karyawan</span>
+                    <span>{staffSuggestions.length} staf</span>
+                  </div>
+                  {staffSuggestions.length === 0 ? (
+                    <div className="px-3 py-4 text-center text-slate-400 text-xs">
+                      Tidak ditemukan nama staf "{staffQuery}"
+                    </div>
+                  ) : (
+                    staffSuggestions.map((st, idx) => {
+                      const isSelected = selectedNip === st.nip;
+                      const isHighlighted = idx === highlightedStaffIdx;
+                      return (
+                        <button
+                          key={st.nip}
+                          type="button"
+                          onClick={() => handleSelectStaff(st)}
+                          onMouseEnter={() => setHighlightedStaffIdx(idx)}
+                          className={`w-full min-h-[44px] px-3 py-2 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer text-xs ${
+                            isSelected
+                              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold'
+                              : isHighlighted
+                              ? 'bg-slate-100 dark:bg-slate-800/70 text-slate-900 dark:text-white'
+                              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 truncate">
+                            <div
+                              className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-[10px] shrink-0 ${
+                                isSelected
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                              }`}
+                            >
+                              {st.nama.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="truncate">
+                              <div className="truncate font-semibold">{st.nama}</div>
+                              <div className="text-[10px] font-mono text-slate-400">{st.nip}</div>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </div>
           ) : viewMode === 'individual' && isStaffPortal ? (
             <div>
@@ -301,7 +496,7 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
             <select
               value={selectedBulan}
               onChange={(e) => setSelectedBulan(Number(e.target.value))}
-              className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-white"
+              className="min-h-[40px] px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-white"
             >
               {NAMA_BULAN_INDO.map((bln, idx) => (
                 <option key={bln} value={idx + 1}>
@@ -316,7 +511,7 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
             <select
               value={selectedTahun}
               onChange={(e) => setSelectedTahun(Number(e.target.value))}
-              className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-white"
+              className="min-h-[40px] px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-white"
             >
               <option value={2025}>2025</option>
               <option value={2026}>2026</option>
@@ -325,19 +520,32 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
         </div>
 
         {viewMode === 'individual' && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {!isStaffPortal && currentSlip && (
+              <button
+                type="button"
+                onClick={handleClearSelectedStaff}
+                className="min-h-[44px] sm:min-h-0 px-3 py-2 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-amber-200 dark:border-amber-800 transition-colors cursor-pointer"
+                title="Sembunyikan slip gaji dari layar"
+              >
+                <EyeOff className="w-4 h-4" />
+                Sembunyikan
+              </button>
+            )}
             <button
               type="button"
+              disabled={!currentSlip}
               onClick={() => setIsThermalOpen(true)}
-              className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+              className="min-h-[44px] sm:min-h-0 px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Receipt className="w-4 h-4 text-emerald-500" />
               Thermal POS &amp; WA
             </button>
             <button
               type="button"
+              disabled={!currentSlip}
               onClick={handlePrintA4}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              className="min-h-[44px] sm:min-h-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Printer className="w-4 h-4" />
               Cetak PDF A4 Resmi
@@ -560,6 +768,38 @@ export const SlipGajiTab: React.FC<SlipGajiTabProps> = ({
               itemLabel="slip gaji staf"
             />
           </div>
+        </div>
+      )}
+
+      {/* VIEW MODE 2: PRIVACY SHIELD WHEN NO STAFF SELECTED */}
+      {viewMode === 'individual' && !currentSlip && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 sm:p-12 shadow-xs max-w-2xl mx-auto text-center space-y-4 no-print">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto border border-slate-200 dark:border-slate-700 shadow-inner">
+            <ShieldCheck className="w-8 h-8" />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              Tampilan Slip Gaji Terlindungi (Privasi Aktif)
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+              Demi menjaga kerahasiaan data gaji staf saat layar dibuka di hadapan umum, slip gaji tidak ditampilkan secara otomatis. Ketik dan pilih nama karyawan pada kotak saran di atas untuk membuka rincian slip gaji.
+            </p>
+          </div>
+          {!isStaffPortal && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStaffDropdownOpen(true);
+                  staffInputRef.current?.focus();
+                }}
+                className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer"
+              >
+                <Search className="w-4 h-4" />
+                Cari Nama Staf Sekarang
+              </button>
+            </div>
+          )}
         </div>
       )}
 
